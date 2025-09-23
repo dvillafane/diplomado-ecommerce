@@ -1,3 +1,4 @@
+// src/components/ConfirmModal.jsx
 import { useEffect, useRef } from 'react';
 
 const ConfirmModal = ({ show, title = 'Confirmar', text = '¿Estás seguro?', onCancel, onConfirm, confirmText = 'Aceptar' }) => {

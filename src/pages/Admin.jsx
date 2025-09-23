@@ -1,3 +1,4 @@
+// src/pages/Admin.jsx
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';

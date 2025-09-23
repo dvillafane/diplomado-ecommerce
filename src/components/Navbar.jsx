@@ -1,3 +1,4 @@
+// src/components/Navbar.jsx 
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { auth } from '../services/firebase';

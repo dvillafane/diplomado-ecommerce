@@ -1,3 +1,4 @@
+// src/pages/Shop.jsx
 import { Link } from 'react-router-dom';
 import useStore from '../store/store';
 import { useEffect, useState, useMemo } from 'react';

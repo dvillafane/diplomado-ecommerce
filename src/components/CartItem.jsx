@@ -1,3 +1,4 @@
+// src/components/CartItem.jsx
 import { useState } from 'react';
 import { formatCurrency } from '../utils/format';
 import useStore from '../store/store';

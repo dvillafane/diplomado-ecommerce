@@ -1,3 +1,4 @@
+// src/store/store.js
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter } from 'firebase/firestore';

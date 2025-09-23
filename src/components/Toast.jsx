@@ -1,4 +1,4 @@
-//src/components/Toast.jsx
+// src/components/Toast.jsx
 import { useEffect } from 'react';
 
 const Toast = ({ type = 'info', text = '', onClose = () => {}, duration = 3000 }) => {

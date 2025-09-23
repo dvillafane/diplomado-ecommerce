@@ -1,4 +1,4 @@
-//src/components/SkeletonCard.jsx
+// src/components/SkeletonCard.jsx
 const SkeletonCard = ({ height = 200 }) => (
   <div className="card h-100 border-0 shadow-sm">
     <div style={{ height }} className="bg-secondary animate-pulse"></div>

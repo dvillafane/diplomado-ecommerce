@@ -1,3 +1,4 @@
+// src/pages/ProductDetail.jsx
 import { useParams, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { useState, useEffect } from 'react';
