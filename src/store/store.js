@@ -1,9 +1,9 @@
-// src/store/store.js
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import * as Sentry from '@sentry/react';
+import { formatCurrency } from '../utils/format';
 
 export const calculateFinalPrice = (price, discount, globalDiscount = 0) => {
   const discountFactor = 1 - (discount || 0);
@@ -203,10 +203,9 @@ const useStore = create(persist(
         if (!product || product.stock < item.quantity) {
           throw new Error(`Stock insuficiente para ${item.name}`);
         }
-        // Ensure the item has the discounted price
         item.price = calculateFinalPrice(product.price, product.discount);
-        item.originalPrice = product.price; // Store original price
-        item.discount = product.discount || 0; // Store discount
+        item.originalPrice = product.price;
+        item.discount = product.discount || 0;
       }
       try {
         const orderRef = await addDoc(collection(db, 'orders'), {
@@ -225,7 +224,8 @@ const useStore = create(persist(
         await batch.commit();
         await get().fetchOrders();
         set({ cart: [], coupon: '', discount: 0 });
-        get().sendNotification(order.userId, `Tu pedido ha sido creado con ID: ${orderRef.id}`);
+        const message = `Nuevo pedido: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(order.total)}`;
+        get().sendNotification(order.userId, message);
         return orderRef.id;
       } catch (err) {
         console.error('Error en createOrder:', err);
@@ -259,12 +259,12 @@ const useStore = create(persist(
         const orderRef = doc(db, 'orders', id);
         const snap = await getDoc(orderRef);
         const userId = data.userId || snap.data()?.userId;
-        // Recalculate total using discounted prices
         data.total = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
         await updateDoc(orderRef, data);
         await get().fetchOrders();
         if (userId) {
-          get().sendNotification(userId, `Tu pedido ${id} ha sido actualizado.`);
+          const message = `Pedido actualizado: ${data.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(data.total)}`;
+          get().sendNotification(userId, message);
         }
       } catch (err) {
         console.error('Error en updateOrder:', err);
@@ -277,11 +277,13 @@ const useStore = create(persist(
         const orderRef = doc(db, 'orders', id);
         const snap = await getDoc(orderRef);
         if (snap.exists()) {
-          const userId = snap.data().userId;
+          const orderData = snap.data();
+          const userId = orderData.userId;
+          const message = `Pedido cancelado: ${orderData.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(orderData.total)}`;
           await deleteDoc(orderRef);
           await get().fetchOrders();
           if (userId) {
-            get().sendNotification(userId, `Tu pedido ${id} ha sido eliminado.`);
+            get().sendNotification(userId, message);
           }
         }
       } catch (err) {
@@ -332,7 +334,7 @@ const useStore = create(persist(
         if (phone) {
           const cleanedPhone = phone.replace(/\D/g, '');
           const encodedMessage = encodeURIComponent(message);
-          window.open(`https://web.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`, '_blank');
+          window.open(`https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`, '_blank');
         } else {
           console.warn('No phone number for user', userId);
         }

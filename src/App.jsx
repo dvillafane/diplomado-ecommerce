@@ -32,7 +32,7 @@ const App = () => {
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Cargando...</span>
         </div>
-        <p className="text-muted mt-2">Cargando autenticación...</p>
+        <p className="text-muted mt-2">Cargando...</p>
       </div>
     );
   }

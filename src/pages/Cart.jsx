@@ -1,4 +1,3 @@
-// src/pages/Cart.jsx
 import useStore from '../store/store';
 import { useState } from 'react';
 import { formatCurrency } from '../utils/format';
@@ -22,15 +21,11 @@ const Cart = () => {
       setMsg({ type: 'danger', text: 'El carrito está vacío.' });
       return;
     }
-    if (!window.confirm('Vas a ser redirigido a WhatsApp para confirmar tu pedido. ¿Continuar?')) return;
+    if (!window.confirm('¿Confirmar tu pedido? Se enviará una notificación por WhatsApp.')) return;
     setProcessing(true);
     try {
       await createOrder({ userId: user.uid, items: cart, total: subtotal });
-      const message = `Pedido: ${cart.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(subtotal)}`;
-      const phoneNumber = '573001234567';
-      const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-      window.location.href = url;
-      setMsg({ type: 'success', text: 'Pedido procesado. Redirigiendo a WhatsApp...' });
+      setMsg({ type: 'success', text: 'Pedido procesado. Revisa la notificación en WhatsApp.' });
     } catch (err) {
       console.error(err);
       setMsg({ type: 'danger', text: err.message || 'Error al procesar pedido.' });
