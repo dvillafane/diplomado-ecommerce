@@ -120,10 +120,21 @@ const History = () => {
                         />
                         <div className="card-body p-2">
                           <p className="card-text mb-1 fw-bold">{formatCurrency(o.total)}</p>
-                          <p className="card-text mb-0 text-muted">Pedido #{o.id.slice(-4)}</p>
-                          <p className="card-text small text-muted">Usuario: {o.userEmail || '—'}</p>
-                          <p className="card-text small text-muted">Fecha: {o.createdAt?.toDate().toLocaleDateString() || '—'}</p>
-                          <p className="card-text small text-muted mt-1">Estado: {o.status || 'pending'}</p>
+                          <p className="card-text mb-0 text-muted">Pedido #{o.id.slice(-6)}</p>
+                          <p className="card-text small text-primary fw-bold">Cliente: {user.email}</p>
+                          <p className="card-text small text-muted">Fecha: {o.createdAt?.toDate?.() ? o.createdAt.toDate().toLocaleDateString() : 'Fecha no disponible'}</p>
+                          <p className="card-text small text-muted mt-1">Estado: 
+                            <span className={`ms-1 badge ${
+                              o.status === 'delivered' ? 'bg-success' : 
+                              o.status === 'shipped' ? 'bg-warning' : 
+                              'bg-secondary'
+                            }`}>
+                              {o.status === 'delivered' ? 'Entregado' : 
+                               o.status === 'shipped' ? 'Enviado' : 
+                               o.status === 'pending' ? 'Pendiente' : 
+                               o.status || 'Pendiente'}
+                            </span>
+                          </p>
                           {o.items?.length > 0 && (
                             <details className="mt-2">
                               <summary className="small">Ver items ({o.items.length})</summary>

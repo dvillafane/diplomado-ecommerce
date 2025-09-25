@@ -198,6 +198,14 @@ const useStore = create(persist(
 
     createOrder: async (order) => {
       const { products, calculateFinalPrice, coupon } = get();
+      // Validate deliveryMethod
+      if (!['Domicilio', 'Recoger en tienda'].includes(order.deliveryMethod)) {
+        throw new Error('Método de entrega inválido');
+      }
+      // Validate deliveryAddress for Domicilio
+      if (order.deliveryMethod === 'Domicilio' && (!order.deliveryAddress || order.deliveryAddress.trim().length < 10)) {
+        throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
+      }
       for (const item of order.items) {
         const product = products.find(p => p.id === item.id);
         if (!product || product.stock < item.quantity) {
@@ -208,11 +216,13 @@ const useStore = create(persist(
         item.discount = product.discount || 0;
       }
       try {
-        const orderRef = await addDoc(collection(db, 'orders'), {
+        const orderData = {
           ...order,
           status: 'pending',
           createdAt: new Date(),
-        });
+        };
+        const orderRef = await addDoc(collection(db, 'orders'), orderData);
+        console.log('Order saved in Firestore:', { id: orderRef.id, ...orderData });
         const batch = writeBatch(db);
         for (const item of order.items) {
           const productRef = doc(db, 'products', item.id);
@@ -236,7 +246,7 @@ const useStore = create(persist(
         return orderRef.id;
       } catch (err) {
         console.error('Error en createOrder:', err);
-        get().handleError(new Error('Error creando la orden'), 'Error creando la orden');
+        get().handleError(new Error('Error creando la orden: ' + err.message), 'Error creando la orden');
         throw new Error('Error creando la orden');
       }
     },
@@ -265,24 +275,55 @@ const useStore = create(persist(
       try {
         const orderRef = doc(db, 'orders', id);
         const snap = await getDoc(orderRef);
-        const userId = data.userId || snap.data()?.userId;
+        if (!snap.exists()) {
+          throw new Error('El pedido no existe');
+        }
+        const existingData = snap.data();
+        const userId = data.userId || existingData.userId;
+
+        // Validate deliveryMethod if provided
+        if ('deliveryMethod' in data && !['Domicilio', 'Recoger en tienda'].includes(data.deliveryMethod)) {
+          throw new Error('Método de entrega inválido');
+        }
+        // Validate deliveryAddress for Domicilio
+        if (data.deliveryMethod === 'Domicilio' && (!data.deliveryAddress || data.deliveryAddress.trim().length < 10)) {
+          throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
+        }
+        // Ensure deliveryAddress is null for Recoger en tienda
+        if (data.deliveryMethod === 'Recoger en tienda') {
+          data.deliveryAddress = null;
+        }
+
+        // Calculate total
         data.total = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // Update Firestore
         await updateDoc(orderRef, data);
+        console.log('Order updated in Firestore:', { id, ...data });
+
+        // Fetch updated orders
         await get().fetchOrders();
+
+        // Send notification with validated or existing data
         if (userId) {
+          const finalDeliveryMethod = data.deliveryMethod || existingData.deliveryMethod || 'No especificado';
+          const finalDeliveryAddress = finalDeliveryMethod === 'Domicilio' 
+            ? (data.deliveryAddress || existingData.deliveryAddress || 'No especificada')
+            : 'Recoger en tienda';
+          
           const message = generateOrderUpdateMessage(
             get().user,
             data.items,
             get().coupon,
             data.total,
-            data.deliveryMethod,
-            data.deliveryAddress
+            finalDeliveryMethod,
+            finalDeliveryAddress
           );
           get().sendNotification(userId, message);
         }
       } catch (err) {
         console.error('Error en updateOrder:', err);
-        get().handleError(new Error('Error actualizando pedido'), 'Error actualizando pedido');
+        get().handleError(new Error('Error actualizando pedido: ' + err.message), 'Error actualizando pedido');
       }
     },
 

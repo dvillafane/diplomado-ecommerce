@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 
 const ConfirmModal = ({ show, title = 'Confirmar', text = '¿Estás seguro?', onCancel, onConfirm, confirmText = 'Aceptar' }) => {
   const modalRef = useRef(null);
-
+  
   useEffect(() => {
     if (show) {
       document.body.classList.add('modal-open');
@@ -17,10 +17,10 @@ const ConfirmModal = ({ show, title = 'Confirmar', text = '¿Estás seguro?', on
   if (!show) return null;
 
   return (
-    <div className="modal-backdrop show">
+    <div className="modal-backdrop show" style={{ opacity: 1, backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
       <div className="modal d-block" tabIndex="-1" aria-modal="true" role="dialog" ref={modalRef}>
         <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
+          <div className="modal-content" style={{ opacity: 1 }}>
             <div className="modal-header">
               <h5 className="modal-title">{title}</h5>
               <button type="button" className="btn-close" onClick={onCancel} aria-label="Cerrar"></button>

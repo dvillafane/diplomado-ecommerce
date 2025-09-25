@@ -1,4 +1,3 @@
-// src/pages/Admin.jsx
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
@@ -19,7 +18,7 @@ const Admin = () => {
     createOrder,
     updateOrder,
     deleteOrder,
-    calculateFinalPrice, // Added to use for discounted prices
+    calculateFinalPrice,
   } = useStore();
 
   const [newProduct, setNewProduct] = useState({
@@ -113,10 +112,12 @@ const Admin = () => {
     }
     setLoading(true);
     try {
+      const selectedUser = users.find(u => u.id === newOrder.userId);
       const orderData = {
         userId: newOrder.userId,
+        userEmail: selectedUser ? selectedUser.email : 'Email no disponible',
         items: newOrder.items,
-        total: newOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0), // Use discounted price
+        total: newOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
         createdAt: new Date(),
         status: 'pending',
       };
@@ -188,7 +189,11 @@ const Admin = () => {
     const currentIndex = statuses.indexOf(order.status || 'pending');
     const nextStatus = statuses[(currentIndex + 1) % statuses.length];
     try {
-      await updateOrder(order.id, { status: nextStatus });
+      const selectedUser = users.find(u => u.id === order.userId);
+      await updateOrder(order.id, {
+        status: nextStatus,
+        userEmail: selectedUser ? selectedUser.email : order.userEmail || 'Email no disponible',
+      });
       setMessageToast({ type: 'success', text: `Pedido actualizado a "${nextStatus}".` });
     } catch {
       setMessageToast({ type: 'danger', text: 'Error al actualizar pedido.' });
@@ -213,16 +218,16 @@ const Admin = () => {
         setMessageToast({ type: 'danger', text: `No hay stock disponible para ${product.name}.` });
         return;
       }
-      const discountedPrice = calculateFinalPrice(product.price, product.discount); // Use discounted price
+      const discountedPrice = calculateFinalPrice(product.price, product.discount);
       setNewOrder({
         ...newOrder,
-        items: [...newOrder.items, { 
-          id: product.id, 
-          name: product.name, 
-          price: discountedPrice, // Store discounted price
-          originalPrice: product.price, // Store original price
-          discount: product.discount || 0, // Store discount
-          quantity: 1 
+        items: [...newOrder.items, {
+          id: product.id,
+          name: product.name,
+          price: discountedPrice,
+          originalPrice: product.price,
+          discount: product.discount || 0,
+          quantity: 1
         }],
       });
     }
@@ -490,37 +495,52 @@ const Admin = () => {
                 <div className="card-body p-3">
                   <h6 className="card-subtitle mb-2 text-muted">Pedidos</h6>
                   <div className="list-group mt-3">
-                    {paginatedOrders.map(o => (
-                      <div key={o.id} className="list-group-item">
-                        <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
-                          <div>Pedido #{o.id} • Status: {o.status || 'pending'}</div>
-                          <div><strong>{formatCurrency(o.total)}</strong></div>
+                    {paginatedOrders.map(o => {
+                      const user = users.find(u => u.id === o.userId);
+                      const userEmail = user ? user.email : o.userEmail || 'Email no disponible';
+                      return (
+                        <div key={o.id} className="list-group-item">
+                          <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
+                            <div>
+                              <strong>Pedido #{o.id.slice(-6)}</strong>
+                              <div className="small text-muted">Estado: {o.status || 'pending'}</div>
+                              <div className="small text-primary fw-bold">Cliente: {userEmail}</div>
+                              {o.userPhone && (
+                                <div className="small text-muted">Tel: {o.userPhone}</div>
+                              )}
+                            </div>
+                            <div className="text-end">
+                              <strong>{formatCurrency(o.total)}</strong>
+                              <div className="small text-muted">
+                                {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString() : 'Fecha no disponible'}
+                              </div>
+                            </div>
+                          </div>
+                          {o.items?.length > 0 && (
+                            <details className="mt-2">
+                              <summary className="small">Ver items ({o.items.length})</summary>
+                              <ul className="small mt-2 ps-3">
+                                {o.items.map((it, idx) => (
+                                  <li key={idx}>
+                                    {it.name} x{it.quantity} — {formatCurrency(it.price)}
+                                    {it.discount > 0 && (
+                                      <span className="text-success ms-2">
+                                        (Original: {formatCurrency(it.originalPrice)}, -{(it.discount * 100).toFixed(0)}%)
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                          <div className="mt-2 d-flex flex-wrap gap-2">
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => cycleOrderStatus(o)}>Cambiar status</button>
+                            <button className="btn btn-sm btn-primary" onClick={() => startEditOrder(o)}>Editar</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => confirmAction('deleteOrder', o.id)}>Eliminar</button>
+                          </div>
                         </div>
-                        <div className="small text-muted">Usuario: {o.userEmail || '—'}</div>
-                        {o.items?.length > 0 && (
-                          <details className="mt-2">
-                            <summary className="small">Ver items ({o.items.length})</summary>
-                            <ul className="small mt-2 ps-3">
-                              {o.items.map((it, idx) => (
-                                <li key={idx}>
-                                  {it.name} x{it.quantity} — {formatCurrency(it.price)}
-                                  {it.discount > 0 && (
-                                    <span className="text-success ms-2">
-                                      (Original: {formatCurrency(it.originalPrice)}, -{(it.discount * 100).toFixed(0)}%)
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                        <div className="mt-2 d-flex flex-wrap gap-2">
-                          <button className="btn btn-sm btn-outline-primary" onClick={() => cycleOrderStatus(o)}>Cambiar status</button>
-                          <button className="btn btn-sm btn-primary" onClick={() => startEditOrder(o)}>Editar</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => confirmAction('deleteOrder', o.id)}>Eliminar</button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-3 d-flex justify-content-between">
                     <button
