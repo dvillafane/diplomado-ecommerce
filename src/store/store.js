@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import * as Sentry from '@sentry/react';
-import { formatCurrency } from '../utils/format';
+import { generateWhatsAppMessage, generateOrderUpdateMessage, generateOrderDeleteMessage } from '../utils/whatsappMessage';
 
 export const calculateFinalPrice = (price, discount, globalDiscount = 0) => {
   const discountFactor = 1 - (discount || 0);
@@ -197,7 +197,7 @@ const useStore = create(persist(
     },
 
     createOrder: async (order) => {
-      const { products, calculateFinalPrice } = get();
+      const { products, calculateFinalPrice, coupon } = get();
       for (const item of order.items) {
         const product = products.find(p => p.id === item.id);
         if (!product || product.stock < item.quantity) {
@@ -224,7 +224,14 @@ const useStore = create(persist(
         await batch.commit();
         await get().fetchOrders();
         set({ cart: [], coupon: '', discount: 0 });
-        const message = `Nuevo pedido: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(order.total)}`;
+        const message = generateWhatsAppMessage(
+          get().user,
+          order.items,
+          coupon,
+          order.total,
+          order.deliveryMethod,
+          order.deliveryAddress
+        );
         get().sendNotification(order.userId, message);
         return orderRef.id;
       } catch (err) {
@@ -263,7 +270,14 @@ const useStore = create(persist(
         await updateDoc(orderRef, data);
         await get().fetchOrders();
         if (userId) {
-          const message = `Pedido actualizado: ${data.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(data.total)}`;
+          const message = generateOrderUpdateMessage(
+            get().user,
+            data.items,
+            get().coupon,
+            data.total,
+            data.deliveryMethod,
+            data.deliveryAddress
+          );
           get().sendNotification(userId, message);
         }
       } catch (err) {
@@ -279,7 +293,14 @@ const useStore = create(persist(
         if (snap.exists()) {
           const orderData = snap.data();
           const userId = orderData.userId;
-          const message = `Pedido cancelado: ${orderData.items.map(item => `${item.name} x${item.quantity}`).join(', ')}. Total: ${formatCurrency(orderData.total)}`;
+          const message = generateOrderDeleteMessage(
+            get().user,
+            orderData.items,
+            get().coupon,
+            orderData.total,
+            orderData.deliveryMethod,
+            orderData.deliveryAddress
+          );
           await deleteDoc(orderRef);
           await get().fetchOrders();
           if (userId) {
@@ -331,15 +352,17 @@ const useStore = create(persist(
         const userRef = doc(db, 'users', userId);
         const snap = await getDoc(userRef);
         const phone = snap.data()?.phone;
-        if (phone) {
-          const cleanedPhone = phone.replace(/\D/g, '');
-          const encodedMessage = encodeURIComponent(message);
-          window.open(`https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`, '_blank');
-        } else {
-          console.warn('No phone number for user', userId);
+        if (!phone) {
+          throw new Error('El usuario no tiene un número de celular registrado');
         }
+        const cleanedPhone = phone.replace(/\D/g, ''); // Remove non-digits
+        if (!cleanedPhone) {
+          throw new Error('El número de celular del usuario no es válido');
+        }
+        window.open(`https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${message}`, '_blank');
       } catch (err) {
-        console.error('Error sending notification:', err);
+        console.error('Error enviando notificación:', err);
+        get().handleError(new Error('Error enviando notificación: ' + err.message), 'Error enviando notificación');
       }
     },
   }),

@@ -1,5 +1,5 @@
-import useStore from '../store/store';
 import { useState } from 'react';
+import useStore from '../store/store';
 import { formatCurrency } from '../utils/format';
 import Toast from '../components/Toast';
 import CartItem from '../components/CartItem';
@@ -10,8 +10,19 @@ const Cart = () => {
   const [processing, setProcessing] = useState(false);
   const [couponInput, setCouponInput] = useState(coupon || '');
   const [msg, setMsg] = useState(null);
+  const [deliveryMethod, setDeliveryMethod] = useState('Domicilio'); // Default to 'Domicilio'
+  const [deliveryAddress, setDeliveryAddress] = useState('');
 
   if (!user) return <div className="container my-4 alert alert-danger">Debes iniciar sesión para ver el carrito.</div>;
+
+  // Ensure user has a phone number
+  if (!user.phone) {
+    return (
+      <div className="container my-4 alert alert-warning">
+        Por favor, agrega un número de celular en tu <a href="/historial">perfil</a> para continuar con la compra.
+      </div>
+    );
+  }
 
   const subtotal = cart.reduce((sum, item) => sum + (calculateFinalPrice(item.price, item.discount) * (item.quantity || 0)), 0);
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
@@ -21,11 +32,24 @@ const Cart = () => {
       setMsg({ type: 'danger', text: 'El carrito está vacío.' });
       return;
     }
+    if (deliveryMethod === 'Domicilio' && !deliveryAddress.trim()) {
+      setMsg({ type: 'danger', text: 'Por favor, ingresa una dirección de entrega.' });
+      return;
+    }
     if (!window.confirm('¿Confirmar tu pedido? Se enviará una notificación por WhatsApp.')) return;
+
     setProcessing(true);
     try {
-      await createOrder({ userId: user.uid, items: cart, total: subtotal });
+      // Create order in Firestore
+      await createOrder({
+        userId: user.uid,
+        items: cart,
+        total: subtotal,
+        deliveryMethod,
+        deliveryAddress: deliveryMethod === 'Domicilio' ? deliveryAddress : null,
+      });
       setMsg({ type: 'success', text: 'Pedido procesado. Revisa la notificación en WhatsApp.' });
+      setDeliveryAddress(''); // Reset address after successful order
     } catch (err) {
       console.error(err);
       setMsg({ type: 'danger', text: err.message || 'Error al procesar pedido.' });
@@ -57,7 +81,34 @@ const Cart = () => {
           <div className="col-12 col-md-4">
             <div className="card p-3 shadow-sm">
               <h4 className="text-dark">Resumen</h4>
-              <button className="btn btn-whatsapp w-100 mb-3" onClick={handleCheckout} disabled={processing || cart.length === 0}>
+              <div className="mb-3">
+                <label className="form-label">Método de entrega</label>
+                <select
+                  className="form-select"
+                  value={deliveryMethod}
+                  onChange={(e) => setDeliveryMethod(e.target.value)}
+                >
+                  <option value="Domicilio">Domicilio</option>
+                  <option value="Recoger en tienda">Recoger en tienda</option>
+                </select>
+              </div>
+              {deliveryMethod === 'Domicilio' && (
+                <div className="mb-3">
+                  <label className="form-label">Dirección de entrega</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ingresa tu dirección"
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                  />
+                </div>
+              )}
+              <button
+                className="btn btn-whatsapp w-100 mb-3"
+                onClick={handleCheckout}
+                disabled={processing || cart.length === 0}
+              >
                 {processing ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-2"></span>Procesando...
@@ -67,12 +118,12 @@ const Cart = () => {
               <p className="text-muted">{totalItems} producto{totalItems !== 1 ? 's' : ''} &nbsp; {formatCurrency(subtotal)} COP</p>
               <h5 className="text-dark">Total: {formatCurrency(subtotal)} COP</h5>
               <div className="input-group mb-3">
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="¿Tienes un código de descuento?" 
-                  value={couponInput} 
-                  onChange={(e) => setCouponInput(e.target.value)} 
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="¿Tienes un código de descuento?"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value)}
                 />
                 <button className="btn btn-outline-dark" onClick={tryApplyCoupon}>Aplicar</button>
               </div>
