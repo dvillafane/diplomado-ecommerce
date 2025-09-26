@@ -1,4 +1,5 @@
 // src/pages/Register.jsx
+// Componente funcional que gestiona el registro de nuevos usuarios en la aplicación
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
@@ -8,21 +9,27 @@ import { useNavigate } from 'react-router-dom';
 import Toast from '../components/Toast';
 import { ROUTES } from '../utils/constants';
 
+// Componente principal para la página de registro
 const Register = () => {
+  // Estados locales para gestionar los datos del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [phone, setPhone] = useState('');
-  const { setUser } = useStore();
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
-  const navigate = useNavigate();
+  const { setUser } = useStore(); // Función del store para establecer el usuario autenticado
+  const [loading, setLoading] = useState(false); // Estado para el botón de registro
+  const [toast, setToast] = useState(null); // Estado para mostrar notificaciones
+  const navigate = useNavigate(); // Hook para manejar la navegación
 
+  // Función para validar el formato del correo electrónico
   const validateEmail = (e) => /\S+@\S+\.\S+/.test(e);
+  // Función para validar el formato del número de celular
   const validatePhone = (p) => /^\+?\d{10,15}$/.test(p); // Basic phone validation
 
+  // Función para manejar el proceso de registro
   const handleRegister = async () => {
-    setToast(null);
+    setToast(null); // Limpia notificaciones previas
+    // Validaciones de campos requeridos y formato
     if (!email || !password || !phone) { 
       setToast({ type: 'danger', text: 'Email, contraseña y celular son obligatorios.' }); 
       return; 
@@ -44,10 +51,12 @@ const Register = () => {
       return; 
     }
 
-    setLoading(true);
+    setLoading(true); // Activa el estado de carga
     try {
+      // Crea un nuevo usuario con Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      // Almacena datos adicionales del usuario en Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
@@ -55,23 +64,25 @@ const Register = () => {
         isAdmin: false,
         createdAt: new Date()
       });
-      setUser(user);
+      setUser(user); // Actualiza el store con el usuario autenticado
       setToast({ type: 'success', text: 'Cuenta creada con éxito 🎉' });
-      setTimeout(() => navigate(ROUTES.HOME), 1000);
+      setTimeout(() => navigate(ROUTES.HOME), 1000); // Redirige a la página principal tras 1s
     } catch (err) {
       console.error(err);
       setToast({ type: 'danger', text: 'Error al registrar. Verifica los datos.' });
     } finally {
-      setLoading(false);
+      setLoading(false); // Desactiva el estado de carga
     }
   };
 
+  // Renderiza la interfaz de la página de registro
   return (
     <div className="container my-4">
       <div className="row justify-content-center">
         <div className="col-md-6">
           <div className="card shadow-sm p-4">
             <h1 className="mb-3">Registro</h1>
+            {/* Campo para el correo electrónico */}
             <div className="mb-3">
               <input
                 type="email"
@@ -82,6 +93,7 @@ const Register = () => {
                 aria-label="Correo electrónico"
               />
             </div>
+            {/* Campo para la contraseña */}
             <div className="mb-3">
               <input
                 type="password"
@@ -92,6 +104,7 @@ const Register = () => {
                 aria-label="Contraseña"
               />
             </div>
+            {/* Campo para confirmar la contraseña */}
             <div className="mb-3">
               <input
                 type="password"
@@ -102,6 +115,7 @@ const Register = () => {
                 aria-label="Confirmar contraseña"
               />
             </div>
+            {/* Campo para el número de celular */}
             <div className="mb-3">
               <input
                 type="tel"
@@ -112,6 +126,7 @@ const Register = () => {
                 aria-label="Número de celular"
               />
             </div>
+            {/* Botones para registrarse y volver al inicio de sesión */}
             <button
               className="btn btn-primary w-100 mb-2"
               onClick={handleRegister}
@@ -130,6 +145,7 @@ const Register = () => {
           </div>
         </div>
       </div>
+      {/* Contenedor para notificaciones tipo toast */}
       <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 1060 }}>
         {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       </div>

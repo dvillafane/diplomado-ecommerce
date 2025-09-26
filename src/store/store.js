@@ -1,4 +1,5 @@
 // src/store/store.js
+// Configuración del store global utilizando Zustand para manejar el estado de la aplicación
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter, where } from 'firebase/firestore';
@@ -7,25 +8,31 @@ import * as Sentry from '@sentry/react';
 import { generateWhatsAppMessage, generateOrderUpdateMessage, generateOrderDeleteMessage } from '../utils/whatsappMessage';
 import { DELIVERY_METHODS } from '../utils/constants';
 
+// Función auxiliar para calcular el precio final con descuento
 export const calculateFinalPrice = (price, discount) => {
   const discountFactor = Math.max(0, 1 - (discount || 0)); // Asegurar que el descuento no exceda 100%
   return price * discountFactor;
 };
+
+// Creación del store con Zustand, incluyendo persistencia de ciertos estados
 const useStore = create(persist(
   (set, get) => ({
-    user: null,
-    authReady: false,
-    products: [],
-    cart: [],
-    orders: [],
-    categories: [],
-    searchQuery: '',
-    selectedCategory: '',
-    loading: false,
-    error: null,
-    coupon: '',
-    discount: 0,
-    appliedPromoCode: null,
+    // Estados iniciales del store
+    user: null, // Datos del usuario autenticado
+    authReady: false, // Indica si la autenticación está lista
+    products: [], // Lista de productos
+    cart: [], // Carrito de compras
+    orders: [], // Lista de pedidos
+    categories: [], // Lista de categorías
+    searchQuery: '', // Consulta de búsqueda
+    selectedCategory: '', // Categoría seleccionada
+    loading: false, // Estado de carga
+    error: null, // Errores de la aplicación
+    coupon: '', // Código de cupón aplicado
+    discount: 0, // Descuento del cupón
+    appliedPromoCode: null, // Datos del cupón aplicado
+
+    // Establece el usuario autenticado y sus datos desde Firestore
     setUser: async (firebaseUser) => {
       if (!firebaseUser) {
         set({ user: null, authReady: true });
@@ -57,6 +64,8 @@ const useStore = create(persist(
         });
       }
     },
+
+    // Actualiza el número de celular del usuario en Firestore
     updateUserPhone: async (uid, phone) => {
       try {
         const userRef = doc(db, 'users', uid);
@@ -70,6 +79,8 @@ const useStore = create(persist(
         throw err;
       }
     },
+
+    // Obtiene productos desde Firestore con paginación
     fetchProducts: async (startAfterDoc = null, limitCount = 10) => {
       set({ loading: true, error: null });
       try {
@@ -86,7 +97,7 @@ const useStore = create(persist(
         console.log('Fetched products:', products);
         set({
           products,
-          categories: [...new Set(products.map(p => p.category).filter(Boolean))],
+          categories: [...new Set(products.map(p => p.category).filter(Boolean))], // Extrae categorías únicas
         });
         return products;
       } catch (err) {
@@ -97,6 +108,8 @@ const useStore = create(persist(
         set({ loading: false });
       }
     },
+
+    // Obtiene categorías desde Firestore
     fetchCategories: async () => {
       try {
         const snapshot = await getDocs(collection(db, 'categories'));
@@ -110,6 +123,8 @@ const useStore = create(persist(
         return [];
       }
     },
+
+    // Obtiene pedidos desde Firestore con datos de usuario asociados
     fetchOrders: async (startAfterDoc = null, limitCount = 10) => {
       set({ loading: true, error: null });
       try {
@@ -121,7 +136,7 @@ const useStore = create(persist(
         console.log('Orders snapshot size:', snapshot.size);
         const orders = await Promise.all(snapshot.docs.map(async (doc) => {
             const orderData = { id: doc.id, ...doc.data() };
-            console.log('Datos del pedido:', orderData); // Registrar datos del pedido
+            console.log('Datos del pedido:', orderData);
             try {
                 if (orderData.userId) {
                     const userRef = doc(db, 'users', orderData.userId);
@@ -147,6 +162,8 @@ const useStore = create(persist(
         set({ loading: false });
       }
     },
+
+    // Agrega un producto al carrito
     addToCart: (product, navigate) => {
       const { user, cart, products } = get();
       if (!user) {
@@ -174,6 +191,8 @@ const useStore = create(persist(
       }
       return true;
     },
+
+    // Actualiza la cantidad de un producto en el carrito
     updateCartQuantity: (id, quantity) => {
       const { cart, products } = get();
       const productData = products.find(p => p.id === id);
@@ -186,9 +205,13 @@ const useStore = create(persist(
         ),
       });
     },
+
+    // Elimina un producto del carrito
     removeFromCart: (id) => {
       set({ cart: get().cart.filter((item) => item.id !== id) });
     },
+
+    // Aplica un código promocional
     applyCoupon: async (code) => {
       try {
         const promoQuery = firestoreQuery(
@@ -203,15 +226,7 @@ const useStore = create(persist(
         const promoDoc = promoSnap.docs[0];
         const promo = promoDoc.data();
         const now = new Date();
-        if (!promo.isActive) {
-          set({ discount: 0, coupon: '', appliedPromoCode: null });
-          return false;
-        }
-        if (promo.expiresAt?.toDate() < now) {
-          set({ discount: 0, coupon: '', appliedPromoCode: null });
-          return false;
-        }
-        if (promo.uses >= promo.maxUses) {
+        if (!promo.isActive || promo.expiresAt?.toDate() < now || promo.uses >= promo.maxUses) {
           set({ discount: 0, coupon: '', appliedPromoCode: null });
           return false;
         }
@@ -228,6 +243,8 @@ const useStore = create(persist(
         return false;
       }
     },
+
+    // Consume un código promocional incrementando su contador de usos
     consumePromoCode: async (code) => {
       try {
         const { appliedPromoCode } = get();
@@ -238,7 +255,6 @@ const useStore = create(persist(
         await updateDoc(promoRef, {
           uses: increment(1)
         });
-       
         return true;
       } catch (err) {
         console.error('Error en consumePromoCode:', err);
@@ -246,6 +262,8 @@ const useStore = create(persist(
         return false;
       }
     },
+
+    // Crea un nuevo pedido en Firestore
     createOrder: async (order) => {
       const { products, calculateFinalPrice, coupon, consumePromoCode, discount } = get();
       if (!DELIVERY_METHODS.includes(order.deliveryMethod)) {
@@ -265,7 +283,7 @@ const useStore = create(persist(
         item.discount = product.discount || 0;
         return sum + (item.price * item.quantity);
       }, 0);
-      // Aplicar descuento del cupón y limitar el total a no ser negativo
+      // Aplicar descuento del cupón
       const couponDiscount = discount > 0 ? subtotal * discount : 0;
       const finalTotal = Math.max(0, subtotal - couponDiscount);
      
@@ -314,6 +332,8 @@ const useStore = create(persist(
         throw new Error('Error creando la orden');
       }
     },
+
+    // Actualiza un producto en Firestore
     updateProduct: async (id, data) => {
       try {
         const { orders } = get();
@@ -333,6 +353,8 @@ const useStore = create(persist(
         throw err;
       }
     },
+
+    // Actualiza un pedido en Firestore
     updateOrder: async (id, data) => {
       try {
           console.log('Intentando actualizar pedido:', { id, data });
@@ -399,6 +421,8 @@ const useStore = create(persist(
           throw err;
       }
     },
+
+    // Elimina un pedido de Firestore
     deleteOrder: async (id) => {
       try {
         const orderRef = doc(db, 'orders', id);
@@ -425,14 +449,24 @@ const useStore = create(persist(
         get().handleError(new Error('Error eliminando pedido'), 'Error eliminando pedido');
       }
     },
+
+    // Actualiza la consulta de búsqueda
     setSearchQuery: (query) => set({ searchQuery: query }),
+
+    // Actualiza la categoría seleccionada
     setSelectedCategory: (category) => set({ selectedCategory: category }),
+
+    // Expone la función calculateFinalPrice
     calculateFinalPrice: (price, discount) => calculateFinalPrice(price, discount),
+
+    // Maneja errores y los registra en Sentry
     handleError: (err, message) => {
       console.error(message, err);
       Sentry.captureException(err, { extra: { message } });
       set({ error: message });
     },
+
+    // Envía notificaciones por WhatsApp
     sendNotification: async (userId, message) => {
       try {
         const userRef = doc(db, 'users', userId);
@@ -459,7 +493,8 @@ const useStore = create(persist(
       coupon: state.coupon,
       discount: state.discount,
       appliedPromoCode: state.appliedPromoCode,
-    }),
+    }), // Persiste solo ciertos estados en el almacenamiento local
   }
 ));
+
 export default useStore;

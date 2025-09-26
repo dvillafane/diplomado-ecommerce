@@ -1,4 +1,5 @@
 // src/pages/Admin.jsx
+// Componente principal para el panel de administración, gestiona productos, pedidos y códigos promocionales
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
@@ -9,7 +10,9 @@ import { formatCurrency } from '../utils/format';
 import SpinnerButton from '../components/SpinnerButton';
 import { CATEGORIES, ORDER_STATUSES, ITEMS_PER_PAGE } from '../utils/constants';
 
+// Componente funcional para la página de administración
 const Admin = () => {
+  // Obtiene datos y funciones del store global
   const {
     user,
     products = [],
@@ -22,31 +25,19 @@ const Admin = () => {
     deleteOrder,
     calculateFinalPrice,
   } = useStore();
+
+  // Estados para gestionar formularios y datos
   const [newProduct, setNewProduct] = useState({
-    name: '',
-    price: '',
-    category: '',
-    image: '',
-    description: '',
-    discount: 0,
-    sales: 0,
-    stock: 0,
+    name: '', price: '', category: '', image: '', description: '', discount: 0, sales: 0, stock: 0,
   });
   const [editingProduct, setEditingProduct] = useState(null);
   const [newOrder, setNewOrder] = useState({ userId: '', items: [], total: 0 });
   const [editingOrder, setEditingOrder] = useState(null);
- 
-  // Estado para códigos promocionales
   const [promoCodes, setPromoCodes] = useState([]);
   const [newPromoCode, setNewPromoCode] = useState({
-    code: '',
-    discount: '',
-    maxUses: '',
-    expiresAt: '',
-    description: ''
+    code: '', discount: '', maxUses: '', expiresAt: '', description: ''
   });
   const [editingPromoCode, setEditingPromoCode] = useState(null);
- 
   const [messageToast, setMessageToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState({ show: false, onConfirm: () => {}, title: '', text: '' });
@@ -54,11 +45,12 @@ const Admin = () => {
   const [orderPage, setOrderPage] = useState(0);
   const [promoPage, setPromoPage] = useState(0);
   const [users, setUsers] = useState([]);
-  // Fetch users, products, orders y promo codes
+
+  // Efecto para cargar datos iniciales (usuarios y códigos promocionales)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch users
+        // Obtiene lista de usuarios desde Firestore
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const userList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -66,18 +58,19 @@ const Admin = () => {
           phone: doc.data().phone || '',
         }));
         setUsers(userList);
-        // Fetch promo codes
+        // Carga códigos promocionales
         await fetchPromoCodes();
       } catch {
         setMessageToast({ type: 'danger', text: 'Error cargando datos.' });
       }
     };
     fetchData();
-    fetchProducts();
-    fetchOrders();
+    fetchProducts(); // Carga productos
+    fetchOrders(); // Carga pedidos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Funciones para códigos promocionales
+
+  // Función para obtener códigos promocionales desde Firestore
   const fetchPromoCodes = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'promoCodes'));
@@ -93,7 +86,10 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error cargando códigos promocionales.' });
     }
   };
+
+  // Función para agregar o actualizar códigos promocionales
   const addOrUpdatePromoCode = async () => {
+    // Validaciones de campos requeridos
     if (!newPromoCode.code || !newPromoCode.discount || !newPromoCode.maxUses || !newPromoCode.expiresAt) {
       setMessageToast({ type: 'danger', text: 'Todos los campos son obligatorios.' });
       return;
@@ -130,14 +126,13 @@ const Admin = () => {
         setEditingPromoCode(null);
         setMessageToast({ type: 'success', text: 'Código promocional actualizado correctamente.' });
       } else {
-        // Verificar que el código no exista
+        // Verifica si el código ya existe
         const existingCode = promoCodes.find(code => code.code === promoData.code);
         if (existingCode) {
           setMessageToast({ type: 'danger', text: 'Ya existe un código con ese nombre.' });
           setLoading(false);
           return;
         }
-       
         await addDoc(collection(db, 'promoCodes'), promoData);
         setMessageToast({ type: 'success', text: 'Código promocional creado correctamente.' });
       }
@@ -150,6 +145,8 @@ const Admin = () => {
       setLoading(false);
     }
   };
+
+  // Función para iniciar la edición de un código promocional
   const startEditPromoCode = (promoCode) => {
     setEditingPromoCode(promoCode);
     setNewPromoCode({
@@ -160,6 +157,8 @@ const Admin = () => {
       description: promoCode.description || ''
     });
   };
+
+  // Función para eliminar un código promocional
   const deletePromoCode = async (id) => {
     try {
       await deleteDoc(doc(db, 'promoCodes', id));
@@ -170,6 +169,8 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error al eliminar código promocional.' });
     }
   };
+
+  // Función para activar o desactivar un código promocional
   const togglePromoCodeStatus = async (promoCode) => {
     try {
       await updateDoc(doc(db, 'promoCodes', promoCode.id), {
@@ -185,8 +186,13 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error al cambiar estado del código.' });
     }
   };
+
+  // Verifica si el usuario es administrador
   if (!user || !user.isAdmin) return <div className="container my-4 alert alert-danger">Acceso denegado.</div>;
+
+  // Función para agregar o actualizar productos
   const addOrUpdateProduct = async () => {
+    // Validaciones de campos requeridos
     if (!newProduct.name || newProduct.price === '') {
       setMessageToast({ type: 'danger', text: 'Nombre y precio son obligatorios.' });
       return;
@@ -224,12 +230,15 @@ const Admin = () => {
       setLoading(false);
     }
   };
+
+  // Función para agregar o actualizar pedidos
   const addOrUpdateOrder = async () => {
+    // Validaciones de campos requeridos
     if (!newOrder.userId || newOrder.items.length === 0) {
       setMessageToast({ type: 'danger', text: 'Usuario y al menos un producto son obligatorios.' });
       return;
     }
-    // Validar stock para cada ítem
+    // Verifica stock disponible
     for (const item of newOrder.items) {
       const product = products.find(p => p.id === item.id);
       if (!product || product.stock < item.quantity) {
@@ -265,14 +274,20 @@ const Admin = () => {
       setLoading(false);
     }
   };
+
+  // Función para iniciar la edición de un producto
   const startEditProduct = (product) => {
     setEditingProduct(product);
     setNewProduct({ ...product, discount: product.discount || 0, sales: product.sales || 0, stock: product.stock || 0 });
   };
+
+  // Función para iniciar la edición de un pedido
   const startEditOrder = (order) => {
     setEditingOrder(order);
     setNewOrder({ userId: order.userId, items: order.items, total: order.total });
   };
+
+  // Función para manejar acciones con confirmación
   const confirmAction = (actionType, id = null) => {
     let title = '';
     let text = '';
@@ -297,6 +312,8 @@ const Admin = () => {
     }
     setConfirm({ show: true, onConfirm, title, text });
   };
+
+  // Función para eliminar elementos (producto, pedido o código promocional)
   const deleteItem = async (id, type) => {
     try {
       if (type === 'product') {
@@ -313,29 +330,32 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error al eliminar.' });
     }
   };
+
+  // Función para cambiar el estado de un pedido
   const cycleOrderStatus = async (order) => {
     const statuses = ORDER_STATUSES;
     const currentIndex = statuses.indexOf(order.status || 'pending');
     if (currentIndex === statuses.length - 1) {
-        setMessageToast({ type: 'warning', text: 'El pedido ya está entregado.' });
-        return;
+      setMessageToast({ type: 'warning', text: 'El pedido ya está entregado.' });
+      return;
     }
     const nextStatus = statuses[currentIndex + 1];
     try {
-        console.log('Cambiando estado del pedido:', { id: order.id, currentStatus: order.status, nextStatus });
-        const selectedUser = users.find(u => u.id === order.userId);
-        await updateOrder(order.id, {
-            status: nextStatus,
-            userEmail: selectedUser ? selectedUser.email : order.userEmail || 'Email no disponible',
-            statusHistory: [...(order.statusHistory || []), { status: nextStatus, date: new Date() }],
-        });
-        setMessageToast({ type: 'success', text: `Pedido actualizado a "${nextStatus}".` });
-        await fetchOrders(); // Forzar actualización
+      const selectedUser = users.find(u => u.id === order.userId);
+      await updateOrder(order.id, {
+        status: nextStatus,
+        userEmail: selectedUser ? selectedUser.email : order.userEmail || 'Email no disponible',
+        statusHistory: [...(order.statusHistory || []), { status: nextStatus, date: new Date() }],
+      });
+      setMessageToast({ type: 'success', text: `Pedido actualizado a "${nextStatus}".` });
+      await fetchOrders();
     } catch (error) {
-        console.error('Error en cycleOrderStatus:', error);
-        setMessageToast({ type: 'danger', text: `Error al actualizar pedido: ${error.message}` });
+      console.error('Error en cycleOrderStatus:', error);
+      setMessageToast({ type: 'danger', text: `Error al actualizar pedido: ${error.message}` });
     }
   };
+
+  // Función para agregar un producto al pedido
   const addItemToOrder = (product) => {
     const existingItem = newOrder.items.find(item => item.id === product.id);
     if (existingItem) {
@@ -368,12 +388,16 @@ const Admin = () => {
       });
     }
   };
+
+  // Función para eliminar un producto del pedido
   const removeItemFromOrder = (itemId) => {
     setNewOrder({
       ...newOrder,
       items: newOrder.items.filter(item => item.id !== itemId),
     });
   };
+
+  // Función para actualizar la cantidad de un producto en el pedido
   const updateItemQuantity = (itemId, quantity) => {
     const product = products.find(p => p.id === itemId);
     if (quantity <= 0 || quantity > product.stock) {
@@ -387,9 +411,13 @@ const Admin = () => {
       ),
     });
   };
+
+  // Paginación para productos, pedidos y códigos promocionales
   const paginatedProducts = products.slice(productPage * ITEMS_PER_PAGE, (productPage + 1) * ITEMS_PER_PAGE);
   const paginatedOrders = orders.slice(orderPage * ITEMS_PER_PAGE, (orderPage + 1) * ITEMS_PER_PAGE);
   const paginatedPromoCodes = promoCodes.slice(promoPage * ITEMS_PER_PAGE, (promoPage + 1) * ITEMS_PER_PAGE);
+
+  // Renderiza la interfaz del panel de administración
   return (
     <div className="container-fluid admin-layout">
       <div className="row">
@@ -402,7 +430,7 @@ const Admin = () => {
               </div>
             </div>
           </div>
-          {/* Sección de códigos promocionales */}
+          {/* Sección para gestionar códigos promocionales */}
           <div className="row g-3 mb-3">
             <div className="col-12">
               <div className="card border-0 shadow-sm">
@@ -551,6 +579,7 @@ const Admin = () => {
           </div>
           <div className="row g-3">
             <div className="col-12 col-lg-7">
+              {/* Sección para gestionar productos */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body p-3 p-md-4">
                   <h5 className="card-title mb-4">{editingProduct ? 'Editar producto' : 'Agregar nuevo producto'}</h5>
@@ -656,6 +685,7 @@ const Admin = () => {
                   </div>
                 </div>
               </div>
+              {/* Sección para gestionar pedidos */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body p-3 p-md-4">
                   <h5 className="card-title mb-4">{editingOrder ? 'Editar pedido' : 'Crear nuevo pedido'}</h5>
@@ -734,6 +764,7 @@ const Admin = () => {
               </div>
             </div>
             <div className="col-12 col-lg-5">
+              {/* Lista de productos */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body p-3">
                   <h6 className="card-subtitle mb-2 text-muted">Lista de productos</h6>
@@ -771,6 +802,7 @@ const Admin = () => {
                   </div>
                 </div>
               </div>
+              {/* Lista de pedidos */}
               <div className="card border-0 shadow-sm">
                 <div className="card-body p-3">
                   <h6 className="card-subtitle mb-2 text-muted">Pedidos</h6>
@@ -842,6 +874,7 @@ const Admin = () => {
               </div>
             </div>
           </div>
+          {/* Modal de confirmación para acciones críticas */}
           <ConfirmModal
             show={confirm.show}
             onCancel={() => setConfirm({ show: false, onConfirm: () => {}, title: '', text: '' })}
@@ -852,6 +885,7 @@ const Admin = () => {
             title={confirm.title}
             text={confirm.text}
           />
+          {/* Contenedor para notificaciones tipo toast */}
           <div className="toast-container position-fixed top-0 end-0 p-3" style={{ zIndex: 1055 }}>
             {messageToast && <Toast {...messageToast} onClose={() => setMessageToast(null)} />}
           </div>
@@ -860,4 +894,5 @@ const Admin = () => {
     </div>
   );
 };
+
 export default Admin;

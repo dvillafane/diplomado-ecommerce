@@ -1,4 +1,5 @@
 // src/pages/History.jsx
+// Componente funcional que muestra el historial de compras del usuario y permite actualizar el número de celular
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useStore from '../store/store';
@@ -7,44 +8,54 @@ import Toast from '../components/Toast';
 import SpinnerButton from '../components/SpinnerButton';
 import { ROUTES } from '../utils/constants';
 
+// Componente principal para la página de historial
 const History = () => {
+  // Obtiene datos y funciones del store global
   const { user, orders = [], fetchOrders, updateUserPhone } = useStore();
+  // Estados para gestionar la edición del número de celular y notificaciones
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState(user?.phone || '');
   const [toast, setToast] = useState(null);
 
+  // Efecto para cargar pedidos y actualizar el número de celular cuando cambia el usuario
   useEffect(() => {
     if (user) {
-      fetchOrders();
-      setNewPhone(user.phone || '');
+      fetchOrders(); // Carga los pedidos del usuario
+      setNewPhone(user.phone || ''); // Inicializa el campo de celular
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Función para validar el formato del número de celular
   const validatePhone = (p) => /^\+?\d{10,15}$/.test(p);
 
+  // Función para actualizar el número de celular del usuario
   const handleUpdatePhone = async () => {
     if (!validatePhone(newPhone)) {
       setToast({ type: 'danger', text: 'Número de celular inválido (10-15 dígitos).' });
       return;
     }
     try {
-      await updateUserPhone(user.uid, newPhone);
+      await updateUserPhone(user.uid, newPhone); // Actualiza el número en Firestore
       setToast({ type: 'success', text: 'Número de celular actualizado.' });
-      setIsEditingPhone(false);
+      setIsEditingPhone(false); // Sale del modo edición
     } catch {
       setToast({ type: 'danger', text: 'Error al actualizar el celular.' });
     }
   };
 
+  // Verifica si el usuario está autenticado
   if (!user) return <div className="container my-4 alert alert-danger">Por favor, inicia sesión para ver tu historial de compras.</div>;
 
+  // Filtra los pedidos del usuario actual
   const userOrders = orders.filter(order => order.userId === user.uid);
 
+  // Renderiza la interfaz del historial de compras
   return (
     <div className="container-fluid admin-layout">
       <div className="row">
         <div className="col-12 p-3 p-md-4">
+          {/* Encabezado con título y ícono de notificación */}
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
             <h1 className="h4 mb-3 mb-md-0">Historial de Compras</h1>
             <div className="d-flex align-items-center">
@@ -54,6 +65,7 @@ const History = () => {
             </div>
           </div>
 
+          {/* Sección de perfil del usuario */}
           <div className="card border-0 shadow-sm mb-3">
             <div className="card-body p-3">
               <h6 className="card-subtitle mb-2 text-muted">PERFIL</h6>
@@ -61,6 +73,7 @@ const History = () => {
               <div className="d-flex align-items-center mt-2">
                 <p className="text-muted small mb-0 me-2">Celular: </p>
                 {isEditingPhone ? (
+                  // Formulario para editar el número de celular
                   <div className="d-flex align-items-center">
                     <input
                       type="tel"
@@ -88,6 +101,7 @@ const History = () => {
                     </button>
                   </div>
                 ) : (
+                  // Muestra el número de celular con opción de editar
                   <div>
                     <span className="text-muted small">{user?.phone || 'No registrado'}</span>
                     <button
@@ -102,13 +116,16 @@ const History = () => {
             </div>
           </div>
 
+          {/* Lista de pedidos del usuario */}
           <div className="card border-0 shadow-sm">
             <div className="card-body p-3 p-md-4">
               <h5 className="card-title mb-4">Tus Compras</h5>
               <div className="row g-3">
                 {userOrders.length === 0 ? (
+                  // Mensaje si no hay pedidos
                   <div className="col-12 text-muted">No tienes compras registradas. ¡Explora la tienda para comenzar!</div>
                 ) : (
+                  // Renderiza cada pedido como una tarjeta
                   userOrders.map(o => (
                     <div key={o.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
                       <div className="card h-100 border-0 shadow-sm">
@@ -137,6 +154,7 @@ const History = () => {
                             </span>
                           </p>
                           {o.items?.length > 0 && (
+                            // Detalles desplegables de los ítems del pedido
                             <details className="mt-2">
                               <summary className="small">Ver items ({o.items.length})</summary>
                               <ul className="small mt-2 ps-3">
@@ -162,6 +180,7 @@ const History = () => {
               <Link to={ROUTES.HOME} className="btn btn-link p-0 mt-3 d-block">Volver a la tienda</Link>
             </div>
           </div>
+          {/* Contenedor para notificaciones tipo toast */}
           <div className="toast-container position-fixed top-0 end-0 p-3" style={{ zIndex: 1055 }}>
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
           </div>
