@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
-import { collection, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
 import useStore from '../store/store';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
@@ -34,35 +34,172 @@ const Admin = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [newOrder, setNewOrder] = useState({ userId: '', items: [], total: 0 });
   const [editingOrder, setEditingOrder] = useState(null);
+  
+  // Estado para códigos promocionales
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [newPromoCode, setNewPromoCode] = useState({
+    code: '',
+    discount: '',
+    maxUses: '',
+    expiresAt: '',
+    description: ''
+  });
+  const [editingPromoCode, setEditingPromoCode] = useState(null);
+  
   const [messageToast, setMessageToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState({ show: false, onConfirm: () => {}, title: '', text: '' });
   const [productPage, setProductPage] = useState(0);
   const [orderPage, setOrderPage] = useState(0);
+  const [promoPage, setPromoPage] = useState(0);
   const [users, setUsers] = useState([]);
   const itemsPerPage = 10;
   const categories = ['Electrónica', 'Ropa', 'Hogar', 'Accesorios', 'Otros'];
 
-  // Fetch users for the order form
+  // Fetch users, products, orders y promo codes
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'users'));
-        const userList = snapshot.docs.map(doc => ({
+        // Fetch users
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const userList = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           email: doc.data().email,
           phone: doc.data().phone || '',
         }));
         setUsers(userList);
+
+        // Fetch promo codes
+        await fetchPromoCodes();
       } catch {
-        setMessageToast({ type: 'danger', text: 'Error cargando usuarios.' });
+        setMessageToast({ type: 'danger', text: 'Error cargando datos.' });
       }
     };
-    fetchUsers();
+    fetchData();
     fetchProducts();
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Funciones para códigos promocionales
+  const fetchPromoCodes = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'promoCodes'));
+      const codes = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        expiresAt: doc.data().expiresAt?.toDate() || null,
+        createdAt: doc.data().createdAt?.toDate() || null
+      }));
+      setPromoCodes(codes);
+    } catch (error) {
+      console.error('Error fetching promo codes:', error);
+      setMessageToast({ type: 'danger', text: 'Error cargando códigos promocionales.' });
+    }
+  };
+
+  const addOrUpdatePromoCode = async () => {
+    if (!newPromoCode.code || !newPromoCode.discount || !newPromoCode.maxUses || !newPromoCode.expiresAt) {
+      setMessageToast({ type: 'danger', text: 'Todos los campos son obligatorios.' });
+      return;
+    }
+
+    const discount = parseFloat(newPromoCode.discount);
+    const maxUses = parseInt(newPromoCode.maxUses);
+    const expiresAt = new Date(newPromoCode.expiresAt);
+
+    if (isNaN(discount) || discount <= 0 || discount > 1) {
+      setMessageToast({ type: 'danger', text: 'El descuento debe ser entre 0.01 y 1 (ej. 0.15 para 15%).' });
+      return;
+    }
+
+    if (isNaN(maxUses) || maxUses <= 0) {
+      setMessageToast({ type: 'danger', text: 'Los usos máximos deben ser un número positivo.' });
+      return;
+    }
+
+    if (expiresAt <= new Date()) {
+      setMessageToast({ type: 'danger', text: 'La fecha de expiración debe ser futura.' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const promoData = {
+        code: newPromoCode.code.toUpperCase(),
+        discount,
+        maxUses,
+        uses: editingPromoCode ? editingPromoCode.uses || 0 : 0,
+        expiresAt,
+        description: newPromoCode.description || '',
+        createdAt: editingPromoCode ? editingPromoCode.createdAt : new Date(),
+        isActive: true
+      };
+
+      if (editingPromoCode) {
+        await updateDoc(doc(db, 'promoCodes', editingPromoCode.id), promoData);
+        setEditingPromoCode(null);
+        setMessageToast({ type: 'success', text: 'Código promocional actualizado correctamente.' });
+      } else {
+        // Verificar que el código no exista
+        const existingCode = promoCodes.find(code => code.code === promoData.code);
+        if (existingCode) {
+          setMessageToast({ type: 'danger', text: 'Ya existe un código con ese nombre.' });
+          setLoading(false);
+          return;
+        }
+        
+        await addDoc(collection(db, 'promoCodes'), promoData);
+        setMessageToast({ type: 'success', text: 'Código promocional creado correctamente.' });
+      }
+
+      await fetchPromoCodes();
+      setNewPromoCode({ code: '', discount: '', maxUses: '', expiresAt: '', description: '' });
+    } catch (err) {
+      console.error('Error saving promo code:', err);
+      setMessageToast({ type: 'danger', text: err.message || 'Error al guardar código promocional.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditPromoCode = (promoCode) => {
+    setEditingPromoCode(promoCode);
+    setNewPromoCode({
+      code: promoCode.code,
+      discount: promoCode.discount.toString(),
+      maxUses: promoCode.maxUses.toString(),
+      expiresAt: promoCode.expiresAt ? promoCode.expiresAt.toISOString().split('T')[0] : '',
+      description: promoCode.description || ''
+    });
+  };
+
+  const deletePromoCode = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'promoCodes', id));
+      await fetchPromoCodes();
+      setMessageToast({ type: 'success', text: 'Código promocional eliminado.' });
+    } catch (error) {
+      console.error('Error deleting promo code:', error);
+      setMessageToast({ type: 'danger', text: 'Error al eliminar código promocional.' });
+    }
+  };
+
+  const togglePromoCodeStatus = async (promoCode) => {
+    try {
+      await updateDoc(doc(db, 'promoCodes', promoCode.id), {
+        isActive: !promoCode.isActive
+      });
+      await fetchPromoCodes();
+      setMessageToast({ 
+        type: 'success', 
+        text: `Código promocional ${promoCode.isActive ? 'desactivado' : 'activado'}.` 
+      });
+    } catch (error) {
+      console.error('Error toggling promo code status:', error);
+      setMessageToast({ type: 'danger', text: 'Error al cambiar estado del código.' });
+    }
+  };
 
   if (!user || !user.isAdmin) return <div className="container my-4 alert alert-danger">Acceso denegado.</div>;
 
@@ -152,10 +289,10 @@ const Admin = () => {
     let title = '';
     let text = '';
     let onConfirm = () => {};
-    if (actionType === 'deleteProduct' || actionType === 'deleteOrder') {
-      const type = actionType === 'deleteProduct' ? 'product' : 'order';
-      title = `Eliminar ${type === 'product' ? 'producto' : 'pedido'}`;
-      text = `¿Estás seguro de eliminar este ${type === 'product' ? 'producto' : 'pedido'}?`;
+    if (actionType === 'deleteProduct' || actionType === 'deleteOrder' || actionType === 'deletePromoCode') {
+      const type = actionType === 'deleteProduct' ? 'product' : actionType === 'deleteOrder' ? 'order' : 'promoCode';
+      title = `Eliminar ${type === 'product' ? 'producto' : type === 'order' ? 'pedido' : 'código promocional'}`;
+      text = `¿Estás seguro de eliminar este ${type === 'product' ? 'producto' : type === 'order' ? 'pedido' : 'código promocional'}?`;
       onConfirm = () => deleteItem(id, type);
     } else if (actionType === 'addOrUpdateProduct') {
       title = editingProduct ? 'Actualizar Producto' : 'Agregar Producto';
@@ -165,6 +302,10 @@ const Admin = () => {
       title = editingOrder ? 'Actualizar Pedido' : 'Crear Pedido';
       text = `¿Estás seguro de ${editingOrder ? 'actualizar' : 'crear'} este pedido?`;
       onConfirm = addOrUpdateOrder;
+    } else if (actionType === 'addOrUpdatePromoCode') {
+      title = editingPromoCode ? 'Actualizar Código' : 'Crear Código';
+      text = `¿Estás seguro de ${editingPromoCode ? 'actualizar' : 'crear'} este código promocional?`;
+      onConfirm = addOrUpdatePromoCode;
     }
     setConfirm({ show: true, onConfirm, title, text });
   };
@@ -178,6 +319,8 @@ const Admin = () => {
       } else if (type === 'order') {
         await deleteOrder(id);
         setMessageToast({ type: 'success', text: 'Pedido eliminado.' });
+      } else if (type === 'promoCode') {
+        await deletePromoCode(id);
       }
     } catch {
       setMessageToast({ type: 'danger', text: 'Error al eliminar.' });
@@ -256,6 +399,7 @@ const Admin = () => {
 
   const paginatedProducts = products.slice(productPage * itemsPerPage, (productPage + 1) * itemsPerPage);
   const paginatedOrders = orders.slice(orderPage * itemsPerPage, (orderPage + 1) * itemsPerPage);
+  const paginatedPromoCodes = promoCodes.slice(promoPage * itemsPerPage, (promoPage + 1) * itemsPerPage);
 
   return (
     <div className="container-fluid admin-layout">
@@ -269,6 +413,156 @@ const Admin = () => {
               </div>
             </div>
           </div>
+
+          {/* Sección de códigos promocionales */}
+          <div className="row g-3 mb-3">
+            <div className="col-12">
+              <div className="card border-0 shadow-sm">
+                <div className="card-body p-3 p-md-4">
+                  <h5 className="card-title mb-4">{editingPromoCode ? 'Editar código promocional' : 'Crear nuevo código promocional'}</h5>
+                  <div className="row g-3">
+                    <div className="col-12 col-md-3">
+                      <label className="form-label">Código</label>
+                      <input
+                        className="form-control"
+                        placeholder="DESCUENTO15"
+                        value={newPromoCode.code}
+                        onChange={(e) => setNewPromoCode({ ...newPromoCode, code: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+                    <div className="col-12 col-md-2">
+                      <label className="form-label">Descuento (%)</label>
+                      <input
+                        className="form-control"
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="100"
+                        placeholder="15"
+                        value={newPromoCode.discount ? (parseFloat(newPromoCode.discount) * 100).toString() : ''}
+                        onChange={(e) => setNewPromoCode({ ...newPromoCode, discount: (e.target.value / 100).toString() })}
+                      />
+                    </div>
+                    <div className="col-12 col-md-2">
+                      <label className="form-label">Usos máximos</label>
+                      <input
+                        className="form-control"
+                        type="number"
+                        min="1"
+                        placeholder="100"
+                        value={newPromoCode.maxUses}
+                        onChange={(e) => setNewPromoCode({ ...newPromoCode, maxUses: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-12 col-md-3">
+                      <label className="form-label">Fecha de expiración</label>
+                      <input
+                        className="form-control"
+                        type="date"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={newPromoCode.expiresAt}
+                        onChange={(e) => setNewPromoCode({ ...newPromoCode, expiresAt: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-12 col-md-2 d-flex align-items-end">
+                      <SpinnerButton
+                        loading={loading}
+                        onClick={() => confirmAction('addOrUpdatePromoCode')}
+                        className="btn btn-success w-100"
+                      >
+                        {editingPromoCode ? 'Actualizar' : 'Crear'}
+                      </SpinnerButton>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label">Descripción (opcional)</label>
+                      <input
+                        className="form-control"
+                        placeholder="Descuento especial de primavera"
+                        value={newPromoCode.description}
+                        onChange={(e) => setNewPromoCode({ ...newPromoCode, description: e.target.value })}
+                      />
+                    </div>
+                    {editingPromoCode && (
+                      <div className="col-12">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setEditingPromoCode(null);
+                            setNewPromoCode({ code: '', discount: '', maxUses: '', expiresAt: '', description: '' });
+                          }}
+                        >
+                          Cancelar edición
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de códigos promocionales */}
+            <div className="col-12">
+              <div className="card border-0 shadow-sm">
+                <div className="card-body p-3">
+                  <h6 className="card-subtitle mb-2 text-muted">Códigos promocionales</h6>
+                  <div className="list-group mt-3">
+                    {paginatedPromoCodes.map(promo => (
+                      <div key={promo.id} className="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                        <div>
+                          <strong className={`${!promo.isActive ? 'text-muted' : ''}`}>
+                            {promo.code} {!promo.isActive && '(INACTIVO)'}
+                          </strong>
+                          <div className="text-muted small d-flex flex-wrap gap-2">
+                            <span>Desc: {(promo.discount * 100).toFixed(0)}%</span>
+                            <span>Usos: {promo.uses || 0}/{promo.maxUses}</span>
+                            <span>Expira: {promo.expiresAt ? promo.expiresAt.toLocaleDateString() : 'Sin fecha'}</span>
+                            {promo.description && <span>"{promo.description}"</span>}
+                          </div>
+                        </div>
+                        <div className="d-flex gap-2 mt-2 mt-md-0">
+                          <button
+                            className={`btn btn-sm ${promo.isActive ? 'btn-warning' : 'btn-success'}`}
+                            onClick={() => togglePromoCodeStatus(promo)}
+                          >
+                            {promo.isActive ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => startEditPromoCode(promo)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => confirmAction('deletePromoCode', promo.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 d-flex justify-content-between">
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => setPromoPage(p => Math.max(0, p - 1))}
+                      disabled={promoPage === 0}
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => setPromoPage(p => p + 1)}
+                      disabled={(promoPage + 1) * itemsPerPage >= promoCodes.length}
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="row g-3">
             <div className="col-12 col-lg-7">
               <div className="card border-0 shadow-sm mb-3">

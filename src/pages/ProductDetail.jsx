@@ -1,16 +1,19 @@
-// src/pages/ProductDetail.jsx
+
 import { useParams, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import ConfirmModal from '../components/ConfirmModal';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { products, addToCart, calculateFinalPrice, discount } = useStore();
   const [adding, setAdding] = useState(false);
   const [addedMsg, setAddedMsg] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
   const product = (products || []).find(p => String(p.id) === String(id));
@@ -31,11 +34,17 @@ const ProductDetail = () => {
   const onImgError = (e) => e.target.src = '/placeholder.png';
 
   const handleAdd = () => {
+    if (quantity <= 0 || quantity > product.stock) {
+      setAddedMsg(`Cantidad inválida. Stock disponible: ${product.stock}`);
+      setTimeout(() => setAddedMsg(''), 2000);
+      return;
+    }
     setAdding(true);
     try {
-      const added = addToCart({ ...product, quantity: 1 }, navigate);
+      const added = addToCart({ ...product, quantity }, navigate);
       if (added) {
         setAddedMsg('Producto agregado al carrito');
+        setShowModal(true); // Show modal after adding to cart
         setTimeout(() => setAddedMsg(''), 2000);
       } else {
         setAddedMsg('Debes iniciar sesión para agregar productos');
@@ -47,6 +56,25 @@ const ProductDetail = () => {
       setTimeout(() => setAddedMsg(''), 2000);
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleIncrease = () => {
+    if (quantity < product.stock) {
+      setQuantity(quantity + 1);
+    }
+  };
+
+  const handleDecrease = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+
+  const handleQuantityChange = (e) => {
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value >= 1 && value <= product.stock) {
+      setQuantity(value);
     }
   };
 
@@ -86,11 +114,43 @@ const ProductDetail = () => {
                 -{(totalDiscount * 100).toFixed(0)}%
               </div>
             )}
-            <div className="d-flex align-items-center">
+            <div className="d-flex align-items-center mb-3">
               <div className="h3 me-3 text-success fw-bold">
                 {formatCurrency(finalPrice)}
               </div>
-              <button className="btn btn-success" onClick={handleAdd} disabled={adding}>
+            </div>
+            <div className="d-flex align-items-center mb-3">
+              <button
+                className="btn btn-outline-dark btn-sm me-1"
+                onClick={handleDecrease}
+                disabled={quantity <= 1 || adding}
+                aria-label={`Disminuir cantidad de ${product.name}`}
+              >
+                -
+              </button>
+              <input
+                type="number"
+                className="form-control form-control-sm mx-2"
+                value={quantity}
+                onChange={handleQuantityChange}
+                style={{ width: '60px', textAlign: 'center' }}
+                min="1"
+                max={product.stock}
+                aria-label={`Cantidad de ${product.name}`}
+              />
+              <button
+                className="btn btn-outline-dark btn-sm me-3"
+                onClick={handleIncrease}
+                disabled={quantity >= product.stock || adding}
+                aria-label={`Aumentar cantidad de ${product.name}`}
+              >
+                +
+              </button>
+              <button
+                className="btn btn-success"
+                onClick={handleAdd}
+                disabled={adding || product.stock === 0}
+              >
                 {adding ? 'Agregando...' : 'Agregar al carrito'}
               </button>
             </div>
@@ -98,6 +158,20 @@ const ProductDetail = () => {
           {addedMsg && <div className="alert alert-success py-1 px-2">{addedMsg}</div>}
         </div>
       </div>
+      <ConfirmModal
+        show={showModal}
+        title="Producto Agregado"
+        text="El producto se ha agregado al carrito. ¿Qué deseas hacer?"
+        confirmText="Ir al carrito"
+        onCancel={() => {
+          setShowModal(false);
+          navigate('/tienda'); // Redirect to shop on cancel
+        }}
+        onConfirm={() => {
+          setShowModal(false);
+          navigate('/carrito');
+        }}
+      />
     </div>
   );
 };

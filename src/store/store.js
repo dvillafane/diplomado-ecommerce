@@ -1,14 +1,14 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter } from 'firebase/firestore';
+import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import * as Sentry from '@sentry/react';
 import { generateWhatsAppMessage, generateOrderUpdateMessage, generateOrderDeleteMessage } from '../utils/whatsappMessage';
 
-export const calculateFinalPrice = (price, discount, globalDiscount = 0) => {
-  const discountFactor = 1 - (discount || 0);
-  const globalDiscountFactor = 1 - globalDiscount;
-  return price * discountFactor * globalDiscountFactor;
+export const calculateFinalPrice = (price, discount) => {
+  const discountFactor = Math.max(0, 1 - (discount || 0)); // Asegurar que el descuento no exceda 100%
+  return price * discountFactor;
 };
 
 const useStore = create(persist(
@@ -25,6 +25,7 @@ const useStore = create(persist(
     error: null,
     coupon: '',
     discount: 0,
+    appliedPromoCode: null,
 
     setUser: async (firebaseUser) => {
       if (!firebaseUser) {
@@ -196,17 +197,82 @@ const useStore = create(persist(
       set({ cart: get().cart.filter((item) => item.id !== id) });
     },
 
+    applyCoupon: async (code) => {
+      try {
+        const promoQuery = firestoreQuery(
+          collection(db, 'promoCodes'),
+          where('code', '==', code.toUpperCase())
+        );
+        const promoSnap = await getDocs(promoQuery);
+
+        if (promoSnap.empty) {
+          set({ discount: 0, coupon: '', appliedPromoCode: null });
+          return false;
+        }
+
+        const promoDoc = promoSnap.docs[0];
+        const promo = promoDoc.data();
+        const now = new Date();
+
+        if (!promo.isActive) {
+          set({ discount: 0, coupon: '', appliedPromoCode: null });
+          return false;
+        }
+
+        if (promo.expiresAt?.toDate() < now) {
+          set({ discount: 0, coupon: '', appliedPromoCode: null });
+          return false;
+        }
+
+        if (promo.uses >= promo.maxUses) {
+          set({ discount: 0, coupon: '', appliedPromoCode: null });
+          return false;
+        }
+
+        set({ 
+          discount: promo.discount, 
+          coupon: code.toUpperCase(),
+          appliedPromoCode: { id: promoDoc.id, ...promo }
+        });
+        return true;
+      } catch (err) {
+        console.error('Error en applyCoupon:', err);
+        get().handleError(new Error('Error aplicando cupón'), 'Error aplicando cupón');
+        set({ discount: 0, coupon: '', appliedPromoCode: null });
+        return false;
+      }
+    },
+
+    consumePromoCode: async (code) => {
+      try {
+        const { appliedPromoCode } = get();
+        if (!appliedPromoCode || appliedPromoCode.code !== code.toUpperCase()) {
+          return false;
+        }
+
+        const promoRef = doc(db, 'promoCodes', appliedPromoCode.id);
+        await updateDoc(promoRef, {
+          uses: increment(1)
+        });
+        
+        return true;
+      } catch (err) {
+        console.error('Error en consumePromoCode:', err);
+        get().handleError(new Error('Error usando cupón'), 'Error usando cupón');
+        return false;
+      }
+    },
+
     createOrder: async (order) => {
-      const { products, calculateFinalPrice, coupon } = get();
-      // Validate deliveryMethod
+      const { products, calculateFinalPrice, coupon, consumePromoCode, discount } = get();
       if (!['Domicilio', 'Recoger en tienda'].includes(order.deliveryMethod)) {
         throw new Error('Método de entrega inválido');
       }
-      // Validate deliveryAddress for Domicilio
       if (order.deliveryMethod === 'Domicilio' && (!order.deliveryAddress || order.deliveryAddress.trim().length < 10)) {
         throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
       }
-      for (const item of order.items) {
+      // Calcular subtotal con descuentos individuales
+      const subtotal = order.items.reduce((sum, item) => {
         const product = products.find(p => p.id === item.id);
         if (!product || product.stock < item.quantity) {
           throw new Error(`Stock insuficiente para ${item.name}`);
@@ -214,15 +280,24 @@ const useStore = create(persist(
         item.price = calculateFinalPrice(product.price, product.discount);
         item.originalPrice = product.price;
         item.discount = product.discount || 0;
-      }
+        return sum + (item.price * item.quantity);
+      }, 0);
+      // Aplicar descuento del cupón y limitar el total a no ser negativo
+      const couponDiscount = discount > 0 ? subtotal * discount : 0;
+      const finalTotal = Math.max(0, subtotal - couponDiscount);
+      
       try {
         const orderData = {
           ...order,
+          total: finalTotal,
+          couponDiscount: couponDiscount,
           status: 'pending',
           createdAt: new Date(),
+          appliedCoupon: coupon || null
         };
         const orderRef = await addDoc(collection(db, 'orders'), orderData);
         console.log('Order saved in Firestore:', { id: orderRef.id, ...orderData });
+        
         const batch = writeBatch(db);
         for (const item of order.items) {
           const productRef = doc(db, 'products', item.id);
@@ -232,13 +307,19 @@ const useStore = create(persist(
           });
         }
         await batch.commit();
+
+        if (coupon) {
+          await consumePromoCode(coupon);
+        }
+
         await get().fetchOrders();
-        set({ cart: [], coupon: '', discount: 0 });
+        set({ cart: [], coupon: '', discount: 0, appliedPromoCode: null });
+        
         const message = generateWhatsAppMessage(
           get().user,
           order.items,
           coupon,
-          order.total,
+          finalTotal,
           order.deliveryMethod,
           order.deliveryAddress
         );
@@ -281,30 +362,32 @@ const useStore = create(persist(
         const existingData = snap.data();
         const userId = data.userId || existingData.userId;
 
-        // Validate deliveryMethod if provided
         if ('deliveryMethod' in data && !['Domicilio', 'Recoger en tienda'].includes(data.deliveryMethod)) {
           throw new Error('Método de entrega inválido');
         }
-        // Validate deliveryAddress for Domicilio
         if (data.deliveryMethod === 'Domicilio' && (!data.deliveryAddress || data.deliveryAddress.trim().length < 10)) {
           throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
         }
-        // Ensure deliveryAddress is null for Recoger en tienda
         if (data.deliveryMethod === 'Recoger en tienda') {
           data.deliveryAddress = null;
         }
 
-        // Calculate total
-        data.total = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        // Calcular subtotal con descuentos individuales
+        const subtotal = data.items.reduce((sum, item) => {
+          const product = get().products.find(p => p.id === item.id);
+          item.price = product ? calculateFinalPrice(product.price, product.discount) : item.price;
+          return sum + item.price * item.quantity;
+        }, 0);
+        // Aplicar descuento del cupón y limitar el total a no ser negativo
+        const couponDiscount = get().discount > 0 ? subtotal * get().discount : 0;
+        data.total = Math.max(0, subtotal - couponDiscount);
+        data.couponDiscount = couponDiscount;
 
-        // Update Firestore
         await updateDoc(orderRef, data);
         console.log('Order updated in Firestore:', { id, ...data });
 
-        // Fetch updated orders
         await get().fetchOrders();
 
-        // Send notification with validated or existing data
         if (userId) {
           const finalDeliveryMethod = data.deliveryMethod || existingData.deliveryMethod || 'No especificado';
           const finalDeliveryAddress = finalDeliveryMethod === 'Domicilio' 
@@ -358,29 +441,7 @@ const useStore = create(persist(
 
     setSelectedCategory: (category) => set({ selectedCategory: category }),
 
-    applyCoupon: async (code) => {
-      try {
-        const couponRef = doc(db, 'coupons', code);
-        const couponSnap = await getDoc(couponRef);
-        if (!couponSnap.exists()) {
-          set({ discount: 0, coupon: '' });
-          return false;
-        }
-        const coupon = couponSnap.data();
-        if (coupon.expiresAt?.toDate() < new Date() || coupon.uses >= coupon.maxUses) {
-          set({ discount: 0, coupon: '' });
-          return false;
-        }
-        set({ discount: coupon.discount, coupon: code });
-        return true;
-      } catch (err) {
-        console.error('Error en applyCoupon:', err);
-        get().handleError(new Error('Error aplicando cupón'), 'Error aplicando cupón');
-        return false;
-      }
-    },
-
-    calculateFinalPrice: (price, discount) => calculateFinalPrice(price, discount, get().discount),
+    calculateFinalPrice: (price, discount) => calculateFinalPrice(price, discount),
 
     handleError: (err, message) => {
       console.error(message, err);
@@ -396,7 +457,7 @@ const useStore = create(persist(
         if (!phone) {
           throw new Error('El usuario no tiene un número de celular registrado');
         }
-        const cleanedPhone = phone.replace(/\D/g, ''); // Remove non-digits
+        const cleanedPhone = phone.replace(/\D/g, '');
         if (!cleanedPhone) {
           throw new Error('El número de celular del usuario no es válido');
         }
@@ -413,6 +474,7 @@ const useStore = create(persist(
       cart: state.cart,
       coupon: state.coupon,
       discount: state.discount,
+      appliedPromoCode: state.appliedPromoCode,
     }),
   }
 ));

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import useStore from '../store/store';
 import { formatCurrency } from '../utils/format';
@@ -6,16 +7,28 @@ import CartItem from '../components/CartItem';
 import '../styles/Cart.css';
 
 const Cart = () => {
-  const { cart, updateCartQuantity, removeFromCart, coupon, applyCoupon, user, createOrder, calculateFinalPrice } = useStore();
+  const { 
+    cart, 
+    updateCartQuantity, 
+    removeFromCart, 
+    coupon, 
+    discount,
+    appliedPromoCode,
+    applyCoupon, 
+    user, 
+    createOrder, 
+    calculateFinalPrice 
+  } = useStore();
+  
   const [processing, setProcessing] = useState(false);
-  const [couponInput, setCouponInput] = useState(coupon || '');
+  const [couponInput, setCouponInput] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [deliveryMethod, setDeliveryMethod] = useState('Domicilio'); // Default to 'Domicilio'
+  const [deliveryMethod, setDeliveryMethod] = useState('Domicilio');
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   if (!user) return <div className="container my-4 alert alert-danger">Debes iniciar sesión para ver el carrito.</div>;
 
-  // Ensure user has a phone number
   if (!user.phone) {
     return (
       <div className="container my-4 alert alert-warning">
@@ -24,7 +37,16 @@ const Cart = () => {
     );
   }
 
-  const subtotal = cart.reduce((sum, item) => sum + (calculateFinalPrice(item.price, item.discount) * (item.quantity || 0)), 0);
+  // Calcular subtotal considerando solo los descuentos individuales de los productos
+  const subtotal = cart.reduce((sum, item) => {
+    const itemPrice = calculateFinalPrice(item.price, item.discount);
+    return sum + (itemPrice * (item.quantity || 0));
+  }, 0);
+
+  // Calcular descuento del cupón y limitar el total a no ser negativo
+  const couponDiscount = discount > 0 ? Math.min(subtotal * discount, subtotal) : 0;
+  const finalTotal = Math.max(0, subtotal - couponDiscount);
+  
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
   const handleCheckout = async () => {
@@ -36,20 +58,24 @@ const Cart = () => {
       setMsg({ type: 'danger', text: 'Por favor, ingresa una dirección de entrega.' });
       return;
     }
-    if (!window.confirm('¿Confirmar tu pedido? Se enviará una notificación por WhatsApp.')) return;
+    
+    const confirmMessage = `¿Confirmar tu pedido por ${formatCurrency(finalTotal)}? Se enviará una notificación por WhatsApp.`;
+    if (!window.confirm(confirmMessage)) return;
 
     setProcessing(true);
     try {
-      // Create order in Firestore
       await createOrder({
         userId: user.uid,
         items: cart,
-        total: subtotal,
+        total: finalTotal,
         deliveryMethod,
         deliveryAddress: deliveryMethod === 'Domicilio' ? deliveryAddress : null,
+        appliedCoupon: coupon || null,
+        couponDiscount: couponDiscount
       });
       setMsg({ type: 'success', text: 'Pedido procesado. Revisa la notificación en WhatsApp.' });
-      setDeliveryAddress(''); // Reset address after successful order
+      setDeliveryAddress('');
+      setCouponInput('');
     } catch (err) {
       console.error(err);
       setMsg({ type: 'danger', text: err.message || 'Error al procesar pedido.' });
@@ -58,9 +84,31 @@ const Cart = () => {
     }
   };
 
-  const tryApplyCoupon = () => {
-    const ok = applyCoupon(couponInput);
-    setMsg(ok ? { type: 'success', text: 'Cupón aplicado.' } : { type: 'danger', text: 'Cupón inválido o expirado.' });
+  const tryApplyCoupon = async () => {
+    if (!couponInput.trim()) {
+      setMsg({ type: 'danger', text: 'Ingresa un código de descuento.' });
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const success = await applyCoupon(couponInput.trim());
+      if (success) {
+        setMsg({ type: 'success', text: `Cupón "${couponInput.toUpperCase()}" aplicado correctamente. Descuento: ${(discount * 100).toFixed(0)}%` });
+        setCouponInput('');
+      } else {
+        setMsg({ type: 'danger', text: 'Código promocional inválido, expirado o sin usos disponibles.' });
+      }
+    } catch {
+      setMsg({ type: 'danger', text: 'Error al validar el código promocional.' });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    useStore.setState({ discount: 0, coupon: '', appliedPromoCode: null });
+    setMsg({ type: 'info', text: 'Código promocional removido.' });
   };
 
   return (
@@ -70,7 +118,10 @@ const Cart = () => {
         {msg && <Toast {...msg} onClose={() => setMsg(null)} />}
       </div>
       {cart.length === 0 ? (
-        <p className="text-muted">El carrito está vacío.</p>
+        <div className="text-center py-5">
+          <p className="text-muted">El carrito está vacío.</p>
+          <a href="/tienda" className="btn btn-primary">Ir a la tienda</a>
+        </div>
       ) : (
         <div className="row g-3">
           <div className="col-12 col-md-8">
@@ -80,7 +131,8 @@ const Cart = () => {
           </div>
           <div className="col-12 col-md-4">
             <div className="card p-3 shadow-sm">
-              <h4 className="text-dark">Resumen</h4>
+              <h4 className="text-dark">Resumen del pedido</h4>
+              
               <div className="mb-3">
                 <label className="form-label">Método de entrega</label>
                 <select
@@ -92,20 +144,88 @@ const Cart = () => {
                   <option value="Recoger en tienda">Recoger en tienda</option>
                 </select>
               </div>
+              
               {deliveryMethod === 'Domicilio' && (
                 <div className="mb-3">
                   <label className="form-label">Dirección de entrega</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Ingresa tu dirección"
+                    placeholder="Ingresa tu dirección completa"
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                   />
                 </div>
               )}
+
+              <div className="mb-3">
+                <label className="form-label">Código de descuento</label>
+                {coupon ? (
+                  <div className="d-flex align-items-center gap-2">
+                    <div className="bg-success text-white px-3 py-2 rounded flex-grow-1">
+                      <strong>{coupon}</strong> - {(discount * 100).toFixed(0)}% OFF
+                      {appliedPromoCode?.description && (
+                        <div className="small">{appliedPromoCode.description}</div>
+                      )}
+                    </div>
+                    <button 
+                      className="btn btn-outline-danger btn-sm"
+                      onClick={removeCoupon}
+                      title="Remover código"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="input-group">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej: DESCUENTO15"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyPress={(e) => e.key === 'Enter' && !couponLoading && tryApplyCoupon()}
+                    />
+                    <button 
+                      className="btn btn-outline-dark" 
+                      onClick={tryApplyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                    >
+                      {couponLoading ? (
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      ) : 'Aplicar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <hr />
+              <div className="d-flex justify-content-between mb-2">
+                <span>Subtotal ({totalItems} producto{totalItems !== 1 ? 's' : ''})</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+              
+              {couponDiscount > 0 && (
+                <div className="d-flex justify-content-between mb-2 text-success">
+                  <span>Descuento ({coupon})</span>
+                  <span>-{formatCurrency(couponDiscount)}</span>
+                </div>
+              )}
+              
+              <hr />
+              <div className="d-flex justify-content-between mb-3">
+                <strong>Total a pagar</strong>
+                <strong className="text-success">{formatCurrency(finalTotal)}</strong>
+              </div>
+
+              {couponDiscount > 0 && (
+                <div className="alert alert-success py-2 px-3 mb-3">
+                  <small>¡Ahorras {formatCurrency(couponDiscount)} con tu código!</small>
+                </div>
+              )}
+
               <button
-                className="btn btn-whatsapp w-100 mb-3"
+                className="btn btn-success w-100 mb-3"
                 onClick={handleCheckout}
                 disabled={processing || cart.length === 0}
               >
@@ -113,19 +233,17 @@ const Cart = () => {
                   <>
                     <span className="spinner-border spinner-border-sm me-2"></span>Procesando...
                   </>
-                ) : 'Continuar con la compra'}
+                ) : (
+                  <>
+                    Confirmar pedido - {formatCurrency(finalTotal)}
+                  </>
+                )}
               </button>
-              <p className="text-muted">{totalItems} producto{totalItems !== 1 ? 's' : ''} &nbsp; {formatCurrency(subtotal)} COP</p>
-              <h5 className="text-dark">Total: {formatCurrency(subtotal)} COP</h5>
-              <div className="input-group mb-3">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="¿Tienes un código de descuento?"
-                  value={couponInput}
-                  onChange={(e) => setCouponInput(e.target.value)}
-                />
-                <button className="btn btn-outline-dark" onClick={tryApplyCoupon}>Aplicar</button>
+
+              <div className="text-center">
+                <small className="text-muted">
+                  Se enviará confirmación por WhatsApp
+                </small>
               </div>
             </div>
           </div>

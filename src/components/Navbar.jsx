@@ -1,17 +1,20 @@
-// src/components/Navbar.jsx 
+
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { auth } from '../services/firebase';
 import { useState, useEffect, useRef } from 'react';
 
 const Navbar = () => {
-  const { user, fetchProducts } = useStore();
+  const { user, fetchProducts, cart } = useStore();
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const dropdownMenuRef = useRef(null);
+
+  // Calculate total items in cart
+  const totalCartItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -81,9 +84,18 @@ const Navbar = () => {
               </Link>
             </li>
             {user && (
-              <li className="nav-item">
-                <Link className="nav-link d-flex align-items-center gap-2" to="/carrito" onClick={() => setMenuOpen(false)}>
+              <li className="nav-item position-relative">
+                <Link
+                  className="nav-link d-flex align-items-center gap-2"
+                  to="/carrito"
+                  onClick={() => setMenuOpen(false)}
+                >
                   <span className="material-icons">shopping_cart</span>
+                  {totalCartItems > 0 && (
+                    <span className="badge bg-danger rounded-circle position-absolute" style={{ top: '-8px', right: '-8px', fontSize: '0.7rem', padding: '4px 8px' }}>
+                      {totalCartItems}
+                    </span>
+                  )}
                   {menuOpen && <span>Carrito</span>}
                 </Link>
               </li>

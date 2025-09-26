@@ -128,3 +128,19 @@ body {
     padding: 0.25rem 0.5rem;
   }
 }
+
+/* Quantity Selector in ProductDetail */
+.quantity-selector {
+  display: flex;
+  align-items: center;
+}
+
+.quantity-selector input.form-control-sm {
+  width: 60px;
+  text-align: center;
+}
+
+.quantity-selector .btn-outline-dark {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+}
