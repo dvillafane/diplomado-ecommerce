@@ -1,4 +1,4 @@
-
+// src/pages/ProductDetail.jsx
 import { useParams, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { formatCurrency } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ConfirmModal from '../components/ConfirmModal';
+import { ROUTES } from '../utils/constants';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -20,14 +21,14 @@ const ProductDetail = () => {
 
   useEffect(() => {
     if (!product) {
-      const t = setTimeout(() => navigate('/tienda'), 2500);
+      const t = setTimeout(() => navigate(ROUTES.SHOP), 2500);
       return () => clearTimeout(t);
     }
   }, [product, navigate]);
 
   if (!product) return (
     <div className="container my-4 text-muted">
-      Producto no encontrado. <Link to="/tienda">Volver a la tienda</Link>.
+      Producto no encontrado. <Link to={ROUTES.SHOP}>Volver a la tienda</Link>.
     </div>
   );
 
@@ -165,11 +166,11 @@ const ProductDetail = () => {
         confirmText="Ir al carrito"
         onCancel={() => {
           setShowModal(false);
-          navigate('/tienda'); // Redirect to shop on cancel
+          navigate(ROUTES.SHOP); // Redirect to shop on cancel
         }}
         onConfirm={() => {
           setShowModal(false);
-          navigate('/carrito');
+          navigate(ROUTES.CART);
         }}
       />
     </div>

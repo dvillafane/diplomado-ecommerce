@@ -7,6 +7,8 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import useStore from './store/store';
 import { auth } from './services/firebase';
+import { ROUTES } from './utils/constants';
+
 const Home = lazy(() => import('./pages/Home'));
 const Shop = lazy(() => import('./pages/Shop'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
@@ -28,7 +30,7 @@ const App = () => {
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Cargando...</span>
         </div>
-        <p className="text-muted mt-2">Cargando...</p>
+        <p className="text-muted mt-2">Verificando autenticación...</p>
       </div>
     );
   }
@@ -43,14 +45,14 @@ const App = () => {
           <Navbar />
           <Suspense fallback={<div className="container my-4 text-center">Cargando...</div>}>
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/tienda" element={<Shop />} />
-              <Route path="/producto/:id" element={<ProductDetail />} />
-              <Route path="/carrito" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
-              <Route path="/historial" element={<ProtectedRoute><History /></ProtectedRoute>} />
+              <Route path={ROUTES.HOME} element={<Home />} />
+              <Route path={ROUTES.SHOP} element={<Shop />} />
+              <Route path={ROUTES.PRODUCT(':id')} element={<ProductDetail />} />
+              <Route path={ROUTES.CART} element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+              <Route path={ROUTES.LOGIN} element={<Login />} />
+              <Route path={ROUTES.REGISTER} element={<Register />} />
+              <Route path={ROUTES.ADMIN} element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+              <Route path={ROUTES.HISTORY} element={<ProtectedRoute><History /></ProtectedRoute>} />
               <Route path="*" element={<div className="container my-4 alert alert-danger">Página no encontrada</div>} />
             </Routes>
           </Suspense>

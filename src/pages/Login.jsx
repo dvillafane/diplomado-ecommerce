@@ -5,6 +5,7 @@ import { auth } from '../services/firebase';
 import useStore from '../store/store';
 import { useNavigate } from 'react-router-dom';
 import Toast from '../components/Toast';
+import { ROUTES } from '../utils/constants';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -26,7 +27,7 @@ const Login = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setUser(userCredential.user);
       setToast({ type: 'success', text: 'Bienvenido' });
-      navigate('/');
+      navigate(ROUTES.HOME);
     } catch (err) {
       console.error(err);
       const code = err.code || '';
@@ -93,7 +94,7 @@ const Login = () => {
               </button>
               <button
                 className="btn btn-outline-secondary w-100"
-                onClick={() => navigate('/register')}
+                onClick={() => navigate(ROUTES.REGISTER)}
                 aria-label="Ir a registro"
               >
                 ¿No tienes cuenta? Regístrate

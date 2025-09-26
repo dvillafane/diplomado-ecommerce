@@ -1,10 +1,11 @@
-
+// src/pages/Cart.jsx
 import { useState } from 'react';
 import useStore from '../store/store';
 import { formatCurrency } from '../utils/format';
 import Toast from '../components/Toast';
 import CartItem from '../components/CartItem';
 import '../styles/Cart.css';
+import { DELIVERY_METHODS } from '../utils/constants';
 
 const Cart = () => {
   const { 
@@ -24,7 +25,7 @@ const Cart = () => {
   const [couponInput, setCouponInput] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [deliveryMethod, setDeliveryMethod] = useState('Domicilio');
+  const [deliveryMethod, setDeliveryMethod] = useState(DELIVERY_METHODS[0]);
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   if (!user) return <div className="container my-4 alert alert-danger">Debes iniciar sesión para ver el carrito.</div>;
@@ -54,7 +55,7 @@ const Cart = () => {
       setMsg({ type: 'danger', text: 'El carrito está vacío.' });
       return;
     }
-    if (deliveryMethod === 'Domicilio' && !deliveryAddress.trim()) {
+    if (deliveryMethod === DELIVERY_METHODS[0] && !deliveryAddress.trim()) {
       setMsg({ type: 'danger', text: 'Por favor, ingresa una dirección de entrega.' });
       return;
     }
@@ -69,7 +70,7 @@ const Cart = () => {
         items: cart,
         total: finalTotal,
         deliveryMethod,
-        deliveryAddress: deliveryMethod === 'Domicilio' ? deliveryAddress : null,
+        deliveryAddress: deliveryMethod === DELIVERY_METHODS[0] ? deliveryAddress : null,
         appliedCoupon: coupon || null,
         couponDiscount: couponDiscount
       });
@@ -140,12 +141,13 @@ const Cart = () => {
                   value={deliveryMethod}
                   onChange={(e) => setDeliveryMethod(e.target.value)}
                 >
-                  <option value="Domicilio">Domicilio</option>
-                  <option value="Recoger en tienda">Recoger en tienda</option>
+                  {DELIVERY_METHODS.map(method => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
                 </select>
               </div>
               
-              {deliveryMethod === 'Domicilio' && (
+              {deliveryMethod === DELIVERY_METHODS[0] && (
                 <div className="mb-3">
                   <label className="form-label">Dirección de entrega</label>
                   <input

@@ -6,6 +6,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import useStore from '../store/store';
 import { useNavigate } from 'react-router-dom';
 import Toast from '../components/Toast';
+import { ROUTES } from '../utils/constants';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -56,7 +57,7 @@ const Register = () => {
       });
       setUser(user);
       setToast({ type: 'success', text: 'Cuenta creada con éxito 🎉' });
-      setTimeout(() => navigate('/'), 1000);
+      setTimeout(() => navigate(ROUTES.HOME), 1000);
     } catch (err) {
       console.error(err);
       setToast({ type: 'danger', text: 'Error al registrar. Verifica los datos.' });
@@ -121,7 +122,7 @@ const Register = () => {
             </button>
             <button
               className="btn btn-outline-secondary w-100"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.LOGIN)}
               aria-label="Ir a inicio de sesión"
             >
               ¿Ya tienes cuenta? Inicia sesión

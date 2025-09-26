@@ -1,9 +1,12 @@
+// src/store/store.js
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { doc, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, query as firestoreQuery, limit, startAfter, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import * as Sentry from '@sentry/react';
 import { generateWhatsAppMessage, generateOrderUpdateMessage, generateOrderDeleteMessage } from '../utils/whatsappMessage';
+import { DELIVERY_METHODS } from '../utils/constants';
+
 export const calculateFinalPrice = (price, discount) => {
   const discountFactor = Math.max(0, 1 - (discount || 0)); // Asegurar que el descuento no exceda 100%
   return price * discountFactor;
@@ -245,10 +248,10 @@ const useStore = create(persist(
     },
     createOrder: async (order) => {
       const { products, calculateFinalPrice, coupon, consumePromoCode, discount } = get();
-      if (!['Domicilio', 'Recoger en tienda'].includes(order.deliveryMethod)) {
+      if (!DELIVERY_METHODS.includes(order.deliveryMethod)) {
         throw new Error('Método de entrega inválido');
       }
-      if (order.deliveryMethod === 'Domicilio' && (!order.deliveryAddress || order.deliveryAddress.trim().length < 10)) {
+      if (order.deliveryMethod === DELIVERY_METHODS[0] && (!order.deliveryAddress || order.deliveryAddress.trim().length < 10)) {
         throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
       }
       // Calcular subtotal con descuentos individuales
@@ -341,13 +344,13 @@ const useStore = create(persist(
           const existingData = snap.data();
           console.log('Datos existentes del pedido:', existingData);
           const userId = data.userId || existingData.userId;
-          if ('deliveryMethod' in data && !['Domicilio', 'Recoger en tienda'].includes(data.deliveryMethod)) {
+          if ('deliveryMethod' in data && !DELIVERY_METHODS.includes(data.deliveryMethod)) {
               throw new Error('Método de entrega inválido');
           }
-          if (data.deliveryMethod === 'Domicilio' && (!data.deliveryAddress || data.deliveryAddress.trim().length < 10)) {
+          if (data.deliveryMethod === DELIVERY_METHODS[0] && (!data.deliveryAddress || data.deliveryAddress.trim().length < 10)) {
               throw new Error('La dirección de entrega debe tener al menos 10 caracteres para entrega a domicilio');
           }
-          if (data.deliveryMethod === 'Recoger en tienda') {
+          if (data.deliveryMethod === DELIVERY_METHODS[1]) {
               data.deliveryAddress = null;
           }
           if (data.items) {
@@ -376,7 +379,7 @@ const useStore = create(persist(
           await get().fetchOrders();
           if (userId) {
               const finalDeliveryMethod = data.deliveryMethod || existingData.deliveryMethod || 'No especificado';
-              const finalDeliveryAddress = finalDeliveryMethod === 'Domicilio'
+              const finalDeliveryAddress = finalDeliveryMethod === DELIVERY_METHODS[0]
                   ? (data.deliveryAddress || existingData.deliveryAddress || 'No especificada')
                   : 'Recoger en tienda';
               const message = generateOrderUpdateMessage(

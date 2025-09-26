@@ -6,6 +6,7 @@ import SkeletonCard from '../components/SkeletonCard';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../utils/format';
 import { Helmet } from 'react-helmet-async';
+import { ROUTES } from '../utils/constants';
 
 const Shop = () => {
   const {
@@ -151,7 +152,7 @@ const Shop = () => {
                         )}
                       </div>
                       <Link
-                        to={`/producto/${product.id}`}
+                        to={ROUTES.PRODUCT(product.id)}
                         className={`btn btn-outline-primary btn-sm ${isOutOfStock ? 'disabled' : ''}`}
                         aria-disabled={isOutOfStock}
                       >

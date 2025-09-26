@@ -1,8 +1,9 @@
-
+// src/pages/Navbar.jsx
 import { Link, useNavigate } from 'react-router-dom';
 import useStore from '../store/store';
 import { auth } from '../services/firebase';
 import { useState, useEffect, useRef } from 'react';
+import { ROUTES } from '../utils/constants';
 
 const Navbar = () => {
   const { user, fetchProducts, cart } = useStore();
@@ -21,7 +22,7 @@ const Navbar = () => {
     try {
       await auth.signOut();
       useStore.getState().setUser(null);
-      navigate('/');
+      navigate(ROUTES.HOME);
       fetchProducts();
     } catch (err) {
       console.error('Sign out error', err);
@@ -65,7 +66,7 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <div className="container d-flex justify-content-between align-items-center">
-        <Link className="navbar-brand fw-bold" to="/">
+        <Link className="navbar-brand fw-bold" to={ROUTES.HOME}>
           <span className="me-2">🛍️</span> Tienda
         </Link>
         <button
@@ -78,7 +79,7 @@ const Navbar = () => {
         <div className={`menu-container ${menuOpen ? 'open' : ''}`}>
           <ul className="menu-links d-flex align-items-center gap-3">
             <li className="nav-item">
-              <Link className="nav-link d-flex align-items-center gap-2" to="/tienda" onClick={() => setMenuOpen(false)}>
+              <Link className="nav-link d-flex align-items-center gap-2" to={ROUTES.SHOP} onClick={() => setMenuOpen(false)}>
                 <span className="material-icons">storefront</span>
                 {menuOpen && <span>Tienda</span>}
               </Link>
@@ -87,7 +88,7 @@ const Navbar = () => {
               <li className="nav-item position-relative">
                 <Link
                   className="nav-link d-flex align-items-center gap-2"
-                  to="/carrito"
+                  to={ROUTES.CART}
                   onClick={() => setMenuOpen(false)}
                 >
                   <span className="material-icons">shopping_cart</span>
@@ -102,7 +103,7 @@ const Navbar = () => {
             )}
             {user && user.isAdmin && (
               <li className="nav-item">
-                <Link className="nav-link d-flex align-items-center gap-2" to="/admin" onClick={() => setMenuOpen(false)}>
+                <Link className="nav-link d-flex align-items-center gap-2" to={ROUTES.ADMIN} onClick={() => setMenuOpen(false)}>
                   <span className="material-icons">admin_panel_settings</span>
                   {menuOpen && <span>Admin</span>}
                 </Link>
@@ -125,7 +126,7 @@ const Navbar = () => {
                     <div className="dropdown-menu show mt-2 shadow-sm dropdown-menu-left" ref={dropdownMenuRef}>
                       <Link
                         className="dropdown-item"
-                        to="/historial"
+                        to={ROUTES.HISTORY}
                         onClick={() => {
                           setUserMenuOpen(false);
                           setMenuOpen(false);
@@ -148,7 +149,7 @@ const Navbar = () => {
                 <div className="d-block d-lg-none w-100">
                   <Link
                     className="nav-link d-flex align-items-center gap-2"
-                    to="/historial"
+                    to={ROUTES.HISTORY}
                     onClick={() => setMenuOpen(false)}
                   >
                     <span className="material-icons">history</span>
@@ -167,7 +168,7 @@ const Navbar = () => {
             ) : (
               <Link
                 className="btn btn-primary btn-sm w-100"
-                to="/login"
+                to={ROUTES.LOGIN}
                 onClick={() => setMenuOpen(false)}
               >
                 Iniciar sesión

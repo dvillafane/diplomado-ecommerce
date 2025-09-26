@@ -1,3 +1,4 @@
+// src/pages/Admin.jsx
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
@@ -6,6 +7,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../utils/format';
 import SpinnerButton from '../components/SpinnerButton';
+import { CATEGORIES, ORDER_STATUSES, ITEMS_PER_PAGE } from '../utils/constants';
+
 const Admin = () => {
   const {
     user,
@@ -51,8 +54,6 @@ const Admin = () => {
   const [orderPage, setOrderPage] = useState(0);
   const [promoPage, setPromoPage] = useState(0);
   const [users, setUsers] = useState([]);
-  const itemsPerPage = 10;
-  const categories = ['Electrónica', 'Ropa', 'Hogar', 'Accesorios', 'Otros'];
   // Fetch users, products, orders y promo codes
   useEffect(() => {
     const fetchData = async () => {
@@ -313,7 +314,7 @@ const Admin = () => {
     }
   };
   const cycleOrderStatus = async (order) => {
-    const statuses = ['pending', 'shipped', 'delivered'];
+    const statuses = ORDER_STATUSES;
     const currentIndex = statuses.indexOf(order.status || 'pending');
     if (currentIndex === statuses.length - 1) {
         setMessageToast({ type: 'warning', text: 'El pedido ya está entregado.' });
@@ -386,9 +387,9 @@ const Admin = () => {
       ),
     });
   };
-  const paginatedProducts = products.slice(productPage * itemsPerPage, (productPage + 1) * itemsPerPage);
-  const paginatedOrders = orders.slice(orderPage * itemsPerPage, (orderPage + 1) * itemsPerPage);
-  const paginatedPromoCodes = promoCodes.slice(promoPage * itemsPerPage, (promoPage + 1) * itemsPerPage);
+  const paginatedProducts = products.slice(productPage * ITEMS_PER_PAGE, (productPage + 1) * ITEMS_PER_PAGE);
+  const paginatedOrders = orders.slice(orderPage * ITEMS_PER_PAGE, (orderPage + 1) * ITEMS_PER_PAGE);
+  const paginatedPromoCodes = promoCodes.slice(promoPage * ITEMS_PER_PAGE, (promoPage + 1) * ITEMS_PER_PAGE);
   return (
     <div className="container-fluid admin-layout">
       <div className="row">
@@ -539,7 +540,7 @@ const Admin = () => {
                     <button
                       className="btn btn-outline-secondary"
                       onClick={() => setPromoPage(p => p + 1)}
-                      disabled={(promoPage + 1) * itemsPerPage >= promoCodes.length}
+                      disabled={(promoPage + 1) * ITEMS_PER_PAGE >= promoCodes.length}
                     >
                       Siguiente
                     </button>
@@ -599,7 +600,7 @@ const Admin = () => {
                         onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                       >
                         <option value="">Seleccione categoría</option>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </div>
                     <div className="col-12 col-md-6 col-lg-3">
@@ -763,7 +764,7 @@ const Admin = () => {
                     <button
                       className="btn btn-outline-secondary"
                       onClick={() => setProductPage(p => p + 1)}
-                      disabled={(productPage + 1) * itemsPerPage >= products.length}
+                      disabled={(productPage + 1) * ITEMS_PER_PAGE >= products.length}
                     >
                       Siguiente
                     </button>
@@ -832,7 +833,7 @@ const Admin = () => {
                     <button
                       className="btn btn-outline-secondary"
                       onClick={() => setOrderPage(p => p + 1)}
-                      disabled={(orderPage + 1) * itemsPerPage >= orders.length}
+                      disabled={(orderPage + 1) * ITEMS_PER_PAGE >= orders.length}
                     >
                       Siguiente
                     </button>

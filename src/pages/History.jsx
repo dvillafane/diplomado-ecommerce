@@ -5,6 +5,7 @@ import useStore from '../store/store';
 import { formatCurrency } from '../utils/format';
 import Toast from '../components/Toast';
 import SpinnerButton from '../components/SpinnerButton';
+import { ROUTES } from '../utils/constants';
 
 const History = () => {
   const { user, orders = [], fetchOrders, updateUserPhone } = useStore();
@@ -158,7 +159,7 @@ const History = () => {
                   ))
                 )}
               </div>
-              <Link to="/" className="btn btn-link p-0 mt-3 d-block">Volver a la tienda</Link>
+              <Link to={ROUTES.HOME} className="btn btn-link p-0 mt-3 d-block">Volver a la tienda</Link>
             </div>
           </div>
           <div className="toast-container position-fixed top-0 end-0 p-3" style={{ zIndex: 1055 }}>
