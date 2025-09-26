@@ -6,7 +6,6 @@ import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
 import { formatCurrency } from '../utils/format';
 import SpinnerButton from '../components/SpinnerButton';
-
 const Admin = () => {
   const {
     user,
@@ -20,7 +19,6 @@ const Admin = () => {
     deleteOrder,
     calculateFinalPrice,
   } = useStore();
-
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
@@ -34,7 +32,7 @@ const Admin = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [newOrder, setNewOrder] = useState({ userId: '', items: [], total: 0 });
   const [editingOrder, setEditingOrder] = useState(null);
-  
+ 
   // Estado para códigos promocionales
   const [promoCodes, setPromoCodes] = useState([]);
   const [newPromoCode, setNewPromoCode] = useState({
@@ -45,7 +43,7 @@ const Admin = () => {
     description: ''
   });
   const [editingPromoCode, setEditingPromoCode] = useState(null);
-  
+ 
   const [messageToast, setMessageToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState({ show: false, onConfirm: () => {}, title: '', text: '' });
@@ -55,7 +53,6 @@ const Admin = () => {
   const [users, setUsers] = useState([]);
   const itemsPerPage = 10;
   const categories = ['Electrónica', 'Ropa', 'Hogar', 'Accesorios', 'Otros'];
-
   // Fetch users, products, orders y promo codes
   useEffect(() => {
     const fetchData = async () => {
@@ -68,7 +65,6 @@ const Admin = () => {
           phone: doc.data().phone || '',
         }));
         setUsers(userList);
-
         // Fetch promo codes
         await fetchPromoCodes();
       } catch {
@@ -80,7 +76,6 @@ const Admin = () => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   // Funciones para códigos promocionales
   const fetchPromoCodes = async () => {
     try {
@@ -97,32 +92,26 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error cargando códigos promocionales.' });
     }
   };
-
   const addOrUpdatePromoCode = async () => {
     if (!newPromoCode.code || !newPromoCode.discount || !newPromoCode.maxUses || !newPromoCode.expiresAt) {
       setMessageToast({ type: 'danger', text: 'Todos los campos son obligatorios.' });
       return;
     }
-
     const discount = parseFloat(newPromoCode.discount);
     const maxUses = parseInt(newPromoCode.maxUses);
     const expiresAt = new Date(newPromoCode.expiresAt);
-
     if (isNaN(discount) || discount <= 0 || discount > 1) {
       setMessageToast({ type: 'danger', text: 'El descuento debe ser entre 0.01 y 1 (ej. 0.15 para 15%).' });
       return;
     }
-
     if (isNaN(maxUses) || maxUses <= 0) {
       setMessageToast({ type: 'danger', text: 'Los usos máximos deben ser un número positivo.' });
       return;
     }
-
     if (expiresAt <= new Date()) {
       setMessageToast({ type: 'danger', text: 'La fecha de expiración debe ser futura.' });
       return;
     }
-
     setLoading(true);
     try {
       const promoData = {
@@ -135,7 +124,6 @@ const Admin = () => {
         createdAt: editingPromoCode ? editingPromoCode.createdAt : new Date(),
         isActive: true
       };
-
       if (editingPromoCode) {
         await updateDoc(doc(db, 'promoCodes', editingPromoCode.id), promoData);
         setEditingPromoCode(null);
@@ -148,11 +136,10 @@ const Admin = () => {
           setLoading(false);
           return;
         }
-        
+       
         await addDoc(collection(db, 'promoCodes'), promoData);
         setMessageToast({ type: 'success', text: 'Código promocional creado correctamente.' });
       }
-
       await fetchPromoCodes();
       setNewPromoCode({ code: '', discount: '', maxUses: '', expiresAt: '', description: '' });
     } catch (err) {
@@ -162,7 +149,6 @@ const Admin = () => {
       setLoading(false);
     }
   };
-
   const startEditPromoCode = (promoCode) => {
     setEditingPromoCode(promoCode);
     setNewPromoCode({
@@ -173,7 +159,6 @@ const Admin = () => {
       description: promoCode.description || ''
     });
   };
-
   const deletePromoCode = async (id) => {
     try {
       await deleteDoc(doc(db, 'promoCodes', id));
@@ -184,25 +169,22 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error al eliminar código promocional.' });
     }
   };
-
   const togglePromoCodeStatus = async (promoCode) => {
     try {
       await updateDoc(doc(db, 'promoCodes', promoCode.id), {
         isActive: !promoCode.isActive
       });
       await fetchPromoCodes();
-      setMessageToast({ 
-        type: 'success', 
-        text: `Código promocional ${promoCode.isActive ? 'desactivado' : 'activado'}.` 
+      setMessageToast({
+        type: 'success',
+        text: `Código promocional ${promoCode.isActive ? 'desactivado' : 'activado'}.`
       });
     } catch (error) {
       console.error('Error toggling promo code status:', error);
       setMessageToast({ type: 'danger', text: 'Error al cambiar estado del código.' });
     }
   };
-
   if (!user || !user.isAdmin) return <div className="container my-4 alert alert-danger">Acceso denegado.</div>;
-
   const addOrUpdateProduct = async () => {
     if (!newProduct.name || newProduct.price === '') {
       setMessageToast({ type: 'danger', text: 'Nombre y precio son obligatorios.' });
@@ -241,11 +223,18 @@ const Admin = () => {
       setLoading(false);
     }
   };
-
   const addOrUpdateOrder = async () => {
     if (!newOrder.userId || newOrder.items.length === 0) {
       setMessageToast({ type: 'danger', text: 'Usuario y al menos un producto son obligatorios.' });
       return;
+    }
+    // Validar stock para cada ítem
+    for (const item of newOrder.items) {
+      const product = products.find(p => p.id === item.id);
+      if (!product || product.stock < item.quantity) {
+        setMessageToast({ type: 'danger', text: `Stock insuficiente para ${item.name}. Disponible: ${product?.stock || 0}.` });
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -257,6 +246,7 @@ const Admin = () => {
         total: newOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
         createdAt: new Date(),
         status: 'pending',
+        statusHistory: editingOrder ? (editingOrder.statusHistory || []) : [{ status: 'pending', date: new Date() }],
       };
       if (editingOrder) {
         await updateOrder(editingOrder.id, orderData);
@@ -274,17 +264,14 @@ const Admin = () => {
       setLoading(false);
     }
   };
-
   const startEditProduct = (product) => {
     setEditingProduct(product);
     setNewProduct({ ...product, discount: product.discount || 0, sales: product.sales || 0, stock: product.stock || 0 });
   };
-
   const startEditOrder = (order) => {
     setEditingOrder(order);
     setNewOrder({ userId: order.userId, items: order.items, total: order.total });
   };
-
   const confirmAction = (actionType, id = null) => {
     let title = '';
     let text = '';
@@ -309,7 +296,6 @@ const Admin = () => {
     }
     setConfirm({ show: true, onConfirm, title, text });
   };
-
   const deleteItem = async (id, type) => {
     try {
       if (type === 'product') {
@@ -326,23 +312,29 @@ const Admin = () => {
       setMessageToast({ type: 'danger', text: 'Error al eliminar.' });
     }
   };
-
   const cycleOrderStatus = async (order) => {
     const statuses = ['pending', 'shipped', 'delivered'];
     const currentIndex = statuses.indexOf(order.status || 'pending');
-    const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+    if (currentIndex === statuses.length - 1) {
+        setMessageToast({ type: 'warning', text: 'El pedido ya está entregado.' });
+        return;
+    }
+    const nextStatus = statuses[currentIndex + 1];
     try {
-      const selectedUser = users.find(u => u.id === order.userId);
-      await updateOrder(order.id, {
-        status: nextStatus,
-        userEmail: selectedUser ? selectedUser.email : order.userEmail || 'Email no disponible',
-      });
-      setMessageToast({ type: 'success', text: `Pedido actualizado a "${nextStatus}".` });
-    } catch {
-      setMessageToast({ type: 'danger', text: 'Error al actualizar pedido.' });
+        console.log('Cambiando estado del pedido:', { id: order.id, currentStatus: order.status, nextStatus });
+        const selectedUser = users.find(u => u.id === order.userId);
+        await updateOrder(order.id, {
+            status: nextStatus,
+            userEmail: selectedUser ? selectedUser.email : order.userEmail || 'Email no disponible',
+            statusHistory: [...(order.statusHistory || []), { status: nextStatus, date: new Date() }],
+        });
+        setMessageToast({ type: 'success', text: `Pedido actualizado a "${nextStatus}".` });
+        await fetchOrders(); // Forzar actualización
+    } catch (error) {
+        console.error('Error en cycleOrderStatus:', error);
+        setMessageToast({ type: 'danger', text: `Error al actualizar pedido: ${error.message}` });
     }
   };
-
   const addItemToOrder = (product) => {
     const existingItem = newOrder.items.find(item => item.id === product.id);
     if (existingItem) {
@@ -375,14 +367,12 @@ const Admin = () => {
       });
     }
   };
-
   const removeItemFromOrder = (itemId) => {
     setNewOrder({
       ...newOrder,
       items: newOrder.items.filter(item => item.id !== itemId),
     });
   };
-
   const updateItemQuantity = (itemId, quantity) => {
     const product = products.find(p => p.id === itemId);
     if (quantity <= 0 || quantity > product.stock) {
@@ -396,11 +386,9 @@ const Admin = () => {
       ),
     });
   };
-
   const paginatedProducts = products.slice(productPage * itemsPerPage, (productPage + 1) * itemsPerPage);
   const paginatedOrders = orders.slice(orderPage * itemsPerPage, (orderPage + 1) * itemsPerPage);
   const paginatedPromoCodes = promoCodes.slice(promoPage * itemsPerPage, (promoPage + 1) * itemsPerPage);
-
   return (
     <div className="container-fluid admin-layout">
       <div className="row">
@@ -413,7 +401,6 @@ const Admin = () => {
               </div>
             </div>
           </div>
-
           {/* Sección de códigos promocionales */}
           <div className="row g-3 mb-3">
             <div className="col-12">
@@ -499,7 +486,6 @@ const Admin = () => {
                 </div>
               </div>
             </div>
-
             {/* Lista de códigos promocionales */}
             <div className="col-12">
               <div className="card border-0 shadow-sm">
@@ -562,7 +548,6 @@ const Admin = () => {
               </div>
             </div>
           </div>
-
           <div className="row g-3">
             <div className="col-12 col-lg-7">
               <div className="card border-0 shadow-sm mb-3">
@@ -874,5 +859,4 @@ const Admin = () => {
     </div>
   );
 };
-
 export default Admin;

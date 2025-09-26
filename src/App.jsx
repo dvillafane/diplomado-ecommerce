@@ -7,7 +7,6 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import useStore from './store/store';
 import { auth } from './services/firebase';
-
 const Home = lazy(() => import('./pages/Home'));
 const Shop = lazy(() => import('./pages/Shop'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
@@ -16,16 +15,13 @@ const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Admin = lazy(() => import('./pages/Admin'));
 const History = lazy(() => import('./pages/History'));
-
 const App = () => {
   const { setUser, fetchProducts, authReady } = useStore();
-
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => setUser(user));
     fetchProducts();
     return () => unsubscribe();
   }, [setUser, fetchProducts]);
-
   if (!authReady) {
     return (
       <div className="container my-4 text-center">
@@ -36,7 +32,6 @@ const App = () => {
       </div>
     );
   }
-
   return (
     <ErrorBoundary fallback={<div className="container my-4 alert alert-danger">Error en la aplicación. Por favor, intenta de nuevo.</div>}>
       <HelmetProvider>
@@ -64,5 +59,4 @@ const App = () => {
     </ErrorBoundary>
   );
 };
-
 export default App;

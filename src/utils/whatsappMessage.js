@@ -1,13 +1,11 @@
 import { formatCurrency } from './format';
-
-export const generateWhatsAppMessage = (user, cart, coupon, subtotal, deliveryMethod, deliveryAddress) => {
+export const generateWhatsAppMessage = (user, cart, coupon, subtotal, deliveryMethod, deliveryAddress, status) => {
   const itemsList = cart
     .map((item, index) => {
       const finalPrice = item.price; // Price already calculated in store
       return `${index + 1}. ${item.name} - Cantidad: ${item.quantity} - Precio: ${formatCurrency(finalPrice)}`;
     })
     .join('\n');
-
   const message = `📦 Nuevo Pedido desde la Tienda Online
 👤 Cliente: ${user.email.split('@')[0]}
 📧 Email: ${user.email}
@@ -18,19 +16,17 @@ ${itemsList}
 🎟️ Cupón aplicado: ${coupon || 'Ninguno'}
 💰 Total a pagar: ${formatCurrency(subtotal)}
 🚚 Método de entrega: ${deliveryMethod || 'No especificado'}
-📍 Dirección de entrega: ${deliveryMethod === 'Domicilio' ? (deliveryAddress || 'No especificada') : 'Recoger en tienda'}`;
-
+📍 Dirección de entrega: ${deliveryMethod === 'Domicilio' ? (deliveryAddress || 'No especificada') : 'Recoger en tienda'}
+📦 Estado: ${status || 'Pendiente'}`;
   return encodeURIComponent(message);
 };
-
-export const generateOrderUpdateMessage = (user, items, coupon, total, deliveryMethod, deliveryAddress) => {
+export const generateOrderUpdateMessage = (user, items, coupon, total, deliveryMethod, deliveryAddress, status) => {
   const itemsList = items
     .map((item, index) => {
       const finalPrice = item.price; // Price already calculated
       return `${index + 1}. ${item.name} - Cantidad: ${item.quantity} - Precio: ${formatCurrency(finalPrice)}`;
     })
     .join('\n');
-
   const message = `🔄 Pedido Actualizado desde la Tienda Online
 👤 Cliente: ${user.email.split('@')[0]}
 📧 Email: ${user.email}
@@ -41,11 +37,10 @@ ${itemsList}
 🎟️ Cupón aplicado: ${coupon || 'Ninguno'}
 💰 Total a pagar: ${formatCurrency(total)}
 🚚 Método de entrega: ${deliveryMethod || 'No especificado'}
-📍 Dirección de entrega: ${deliveryMethod === 'Domicilio' ? (deliveryAddress || 'No especificada') : 'Recoger en tienda'}`;
-
+📍 Dirección de entrega: ${deliveryMethod === 'Domicilio' ? (deliveryAddress || 'No especificada') : 'Recoger en tienda'}
+📦 Estado: ${status || 'Pendiente'}`;
   return encodeURIComponent(message);
 };
-
 export const generateOrderDeleteMessage = (user, items, coupon, total, deliveryMethod, deliveryAddress) => {
   const itemsList = items
     .map((item, index) => {
@@ -53,7 +48,6 @@ export const generateOrderDeleteMessage = (user, items, coupon, total, deliveryM
       return `${index + 1}. ${item.name} - Cantidad: ${item.quantity} - Precio: ${formatCurrency(finalPrice)}`;
     })
     .join('\n');
-
   const message = `🗑️ Pedido Cancelado desde la Tienda Online
 👤 Cliente: ${user.email.split('@')[0]}
 📧 Email: ${user.email}
@@ -65,6 +59,5 @@ ${itemsList}
 💰 Total: ${formatCurrency(total)}
 🚚 Método de entrega: ${deliveryMethod || 'No especificado'}
 📍 Dirección de entrega: ${deliveryMethod === 'Domicilio' ? (deliveryAddress || 'No especificada') : 'Recoger en tienda'}`;
-
   return encodeURIComponent(message);
 };
