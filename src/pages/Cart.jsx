@@ -5,7 +5,7 @@ import { formatCurrency } from '../utils/format';
 import Toast from '../components/Toast';
 import CartItem from '../components/CartItem';
 import '../styles/Cart.css';
-import { DELIVERY_METHODS } from '../utils/constants';
+import { DELIVERY_METHODS, ROUTES } from '../utils/constants';
 
 const Cart = () => {
   const { 
@@ -31,12 +31,13 @@ const Cart = () => {
   if (!user) return <div className="container my-4 alert alert-danger">Debes iniciar sesión para ver el carrito.</div>;
 
   if (!user.phone) {
-    return (
-      <div className="container my-4 alert alert-warning">
-        Por favor, agrega un número de celular en tu <a href="/historial">perfil</a> para continuar con la compra.
-      </div>
-    );
-  }
+  return (
+    <div className="container my-4 alert alert-warning">
+      Por favor, agrega un número de celular en tu{' '}
+      <Link to={ROUTES.HISTORY}>perfil</Link> para continuar con la compra.
+    </div>
+  );
+}
 
   // Calcular subtotal considerando solo los descuentos individuales de los productos
   const subtotal = cart.reduce((sum, item) => {
@@ -121,7 +122,9 @@ const Cart = () => {
       {cart.length === 0 ? (
         <div className="text-center py-5">
           <p className="text-muted">El carrito está vacío.</p>
-          <a href="/tienda" className="btn btn-primary">Ir a la tienda</a>
+          <Link to={ROUTES.SHOP} className="btn btn-primary">
+            Ir a la tienda
+          </Link>
         </div>
       ) : (
         <div className="row g-3">

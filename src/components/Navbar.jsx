@@ -115,7 +115,7 @@ const Navbar = () => {
               <>
                 <div className="d-none d-lg-block position-relative">
                   <button
-                    className="btn p-0 border-0"
+                    className="btn btn-link p-0 border-0"
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     ref={dropdownRef}
                     aria-label="Menú de usuario"
