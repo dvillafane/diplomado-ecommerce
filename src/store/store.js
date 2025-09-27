@@ -171,23 +171,32 @@ const useStore = create(persist(
         return false;
       }
       const productData = products.find(p => p.id === product.id);
-      if (productData.stock <= 0) {
+      if (!productData || productData.stock <= 0) {
+        return false;
+      }
+      // Obtener la cantidad solicitada, asegurándose de que sea válida
+      const requestedQuantity = Math.max(1, parseInt(product.quantity) || 1);
+      // Validar que la cantidad no exceda el stock
+      if (requestedQuantity > productData.stock) {
         return false;
       }
       const existing = cart.find((item) => item.id === product.id);
-      if (existing && existing.quantity >= productData.stock) {
-        return false;
-      }
       if (existing) {
+        // Si el producto ya está en el carrito, sumar la cantidad solicitada
+        const newQuantity = existing.quantity + requestedQuantity;
+        if (newQuantity > productData.stock) {
+          return false;
+        }
         set({
           cart: cart.map((item) =>
             item.id === product.id
-              ? { ...item, quantity: (item.quantity || 1) + 1 }
+              ? { ...item, quantity: newQuantity }
               : item
           ),
         });
       } else {
-        set({ cart: [...cart, { ...product, quantity: 1 }] });
+        // Si el producto no está en el carrito, agregarlo con la cantidad solicitada
+        set({ cart: [...cart, { ...product, quantity: requestedQuantity }] });
       }
       return true;
     },

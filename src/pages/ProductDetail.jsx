@@ -55,11 +55,11 @@ const ProductDetail = () => {
     try {
       const added = addToCart({ ...product, quantity }, navigate); // Agrega al carrito
       if (added) {
-        setAddedMsg('Producto agregado al carrito');
+        setAddedMsg(`Producto${quantity > 1 ? 's' : ''} agregado${quantity > 1 ? 's' : ''} al carrito`);
         setShowModal(true); // Muestra el modal de confirmación
         setTimeout(() => setAddedMsg(''), 2000);
       } else {
-        setAddedMsg('Debes iniciar sesión para agregar productos');
+        setAddedMsg('No se pudo agregar al carrito. Verifica el stock o inicia sesión.');
         setTimeout(() => setAddedMsg(''), 2000);
       }
     } catch (err) {
