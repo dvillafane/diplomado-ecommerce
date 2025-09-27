@@ -63,11 +63,11 @@
    ```bash
    npm run dev
    ```
-   
+
 ---
 
 ## Uso
 
-- **Usuarios**: Explora productos, filtra, añade al carrito, aplica códigos promocionales y realiza pedidos. Revisa el historial en `/historial`.
+- **Usuarios**: Explora productos, filtra, añade al carrito, aplica códigos promocionales y realiza pedidos..
 - **Administradores**: Accede para gestionar productos, pedidos y códigos promocionales.
 - **Notificaciones**: Los pedidos generan mensajes de WhatsApp automáticos.
