@@ -130,7 +130,7 @@ const History = () => {
                     <div key={o.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
                       <div className="card h-100 border-0 shadow-sm">
                         <img
-                          src={o.items?.[0]?.image || 'https://via.placeholder.com/80x120?text=Pedido'}
+                          src={o.items?.[0]?.image || '/placeholder.png'} // Cambiado a /placeholder.png
                           className="card-img-top"
                           alt={`Imagen del pedido #${o.id.slice(-4)}`}
                           style={{ height: '120px', objectFit: 'cover' }}
